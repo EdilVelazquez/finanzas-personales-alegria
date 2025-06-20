@@ -108,13 +108,27 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
     setLoading(true);
 
     try {
-      const accountData = {
+      // Preparar los datos base
+      const baseData = {
         name: data.name.trim(),
         type: data.type,
-        balance: data.type === 'debit' ? parseFloat(data.balance) : parseFloat(data.balance) || 0,
-        creditLimit: data.type === 'credit' ? parseFloat(data.creditLimit) : undefined,
         userId: currentUser.uid,
       };
+
+      // Agregar campos específicos según el tipo de cuenta
+      let accountData;
+      if (data.type === 'debit') {
+        accountData = {
+          ...baseData,
+          balance: parseFloat(data.balance),
+        };
+      } else {
+        accountData = {
+          ...baseData,
+          balance: parseFloat(data.balance) || 0,
+          creditLimit: parseFloat(data.creditLimit),
+        };
+      }
 
       if (account) {
         // Actualizar cuenta existente
