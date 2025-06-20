@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import AuthPage from '@/components/Auth/AuthPage';
 import Layout from '@/components/Layout';
 import Dashboard from '@/components/Dashboard';
+import AccountsPage from '@/components/Accounts/AccountsPage';
 import { Toaster } from '@/components/ui/toaster';
 
 const AppContent: React.FC = () => {
@@ -45,12 +46,7 @@ const AppContent: React.FC = () => {
       case 'dashboard':
         return <Dashboard />;
       case 'accounts':
-        return (
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Gestión de Cuentas</h2>
-            <p className="text-gray-600">Esta funcionalidad estará disponible próximamente</p>
-          </div>
-        );
+        return <AccountsPage />;
       case 'transactions':
         return (
           <div className="text-center py-12">
