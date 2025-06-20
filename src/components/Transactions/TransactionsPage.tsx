@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, onSnapshot, orderBy, where, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
@@ -10,7 +9,7 @@ import { Plus, ArrowUpCircle, ArrowDownCircle, Edit, Trash2, Filter } from 'luci
 import { useToast } from '@/hooks/use-toast';
 import TransactionForm from './TransactionForm';
 import DeleteTransactionDialog from './DeleteTransactionDialog';
-import TransactionFilters from './TransactionFilters';
+import TransactionFilters, { TransactionFilters as TTransactionFilters } from './TransactionFilters';
 import {
   Table,
   TableBody,
@@ -19,14 +18,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-
-export interface TransactionFilters {
-  startDate?: Date;
-  endDate?: Date;
-  category?: string;
-  type?: 'income' | 'expense';
-  accountId?: string;
-}
 
 const TransactionsPage: React.FC = () => {
   const { currentUser } = useAuth();
@@ -37,7 +28,7 @@ const TransactionsPage: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<TransactionFilters>({});
+  const [filters, setFilters] = useState<TTransactionFilters>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
