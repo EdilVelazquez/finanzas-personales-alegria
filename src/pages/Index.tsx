@@ -5,6 +5,7 @@ import AuthPage from '@/components/Auth/AuthPage';
 import Layout from '@/components/Layout';
 import Dashboard from '@/components/Dashboard';
 import AccountsPage from '@/components/Accounts/AccountsPage';
+import TransactionsPage from '@/components/Transactions/TransactionsPage';
 import { Toaster } from '@/components/ui/toaster';
 
 const AppContent: React.FC = () => {
