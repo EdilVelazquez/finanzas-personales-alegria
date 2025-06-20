@@ -49,12 +49,7 @@ const AppContent: React.FC = () => {
       case 'accounts':
         return <AccountsPage />;
       case 'transactions':
-        return (
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Transacciones</h2>
-            <p className="text-gray-600">Esta funcionalidad estará disponible próximamente</p>
-          </div>
-        );
+        return <TransactionsPage />;
       case 'reports':
         return (
           <div className="text-center py-12">
