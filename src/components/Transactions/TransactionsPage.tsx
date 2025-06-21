@@ -94,6 +94,29 @@ const TransactionsPage: React.FC = () => {
     };
   }, [currentUser, filters]);
 
+  // Función para calcular el saldo acumulado
+  const calculateRunningBalance = () => {
+    // Ordenar transacciones por fecha ascendente para calcular saldo correcto
+    const sortedTransactions = [...transactions].sort((a, b) => 
+      a.date.getTime() - b.date.getTime()
+    );
+
+    let runningBalance = 0;
+    return sortedTransactions.map(transaction => {
+      if (transaction.type === 'income') {
+        runningBalance += transaction.amount;
+      } else {
+        runningBalance -= transaction.amount;
+      }
+      return {
+        ...transaction,
+        runningBalance
+      };
+    }).reverse(); // Volver a ordenar por fecha descendente para mostrar
+  };
+
+  const transactionsWithBalance = calculateRunningBalance();
+
   const handleCreateTransaction = () => {
     setEditingTransaction(null);
     setIsFormOpen(true);
@@ -219,7 +242,7 @@ const TransactionsPage: React.FC = () => {
           <CardTitle>Lista de Transacciones</CardTitle>
         </CardHeader>
         <CardContent>
-          {transactions.length > 0 ? (
+          {transactionsWithBalance.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -229,11 +252,12 @@ const TransactionsPage: React.FC = () => {
                   <TableHead>Categoría</TableHead>
                   <TableHead>Cuenta</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
+                  <TableHead className="text-right">Saldo</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.map((transaction) => (
+                {transactionsWithBalance.map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell>
                       {transaction.date?.toLocaleDateString('es-ES')}
@@ -258,6 +282,11 @@ const TransactionsPage: React.FC = () => {
                     }`}>
                       {transaction.type === 'income' ? '+' : '-'}
                       ${transaction.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className={`text-right font-medium ${
+                      transaction.runningBalance >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      ${transaction.runningBalance.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
