@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
@@ -19,6 +18,9 @@ import {
 } from 'chart.js';
 import BudgetCalculator from './Dashboard/BudgetCalculator';
 import RecurringItemsManager from './Dashboard/RecurringItemsManager';
+import RecurringIncomeForm from './Dashboard/RecurringIncomeForm';
+import RecurringExpenseForm from './Dashboard/RecurringExpenseForm';
+import DeleteRecurringDialog from './Dashboard/DeleteRecurringDialog';
 import { Button } from '@/components/ui/button';
 import { TrendingUp } from 'lucide-react';
 
@@ -40,6 +42,16 @@ const Dashboard: React.FC = () => {
   const [recurringIncomes, setRecurringIncomes] = useState<RecurringIncome[]>([]);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
   const [showRecurringItems, setShowRecurringItems] = useState(false);
+  
+  // Estados para los formularios
+  const [showIncomeForm, setShowIncomeForm] = useState(false);
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [editingIncome, setEditingIncome] = useState<RecurringIncome | null>(null);
+  const [editingExpense, setEditingExpense] = useState<RecurringExpense | null>(null);
+  const [deletingItem, setDeletingItem] = useState<{
+    item: RecurringIncome | RecurringExpense;
+    type: 'income' | 'expense';
+  } | null>(null);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -137,29 +149,33 @@ const Dashboard: React.FC = () => {
     }]
   };
 
-  // Funciones placeholder para manejar ingresos y gastos recurrentes
+  // Funciones para manejar ingresos y gastos recurrentes
   const handleAddIncome = () => {
-    console.log('Agregar ingreso recurrente');
+    setEditingIncome(null);
+    setShowIncomeForm(true);
   };
 
   const handleAddExpense = () => {
-    console.log('Agregar gasto recurrente');
+    setEditingExpense(null);
+    setShowExpenseForm(true);
   };
 
   const handleEditIncome = (income: RecurringIncome) => {
-    console.log('Editar ingreso:', income);
+    setEditingIncome(income);
+    setShowIncomeForm(true);
   };
 
   const handleEditExpense = (expense: RecurringExpense) => {
-    console.log('Editar gasto:', expense);
+    setEditingExpense(expense);
+    setShowExpenseForm(true);
   };
 
   const handleDeleteIncome = (income: RecurringIncome) => {
-    console.log('Eliminar ingreso:', income);
+    setDeletingItem({ item: income, type: 'income' });
   };
 
   const handleDeleteExpense = (expense: RecurringExpense) => {
-    console.log('Eliminar gasto:', expense);
+    setDeletingItem({ item: expense, type: 'expense' });
   };
 
   return (
@@ -315,6 +331,32 @@ const Dashboard: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Diálogos */}
+      <RecurringIncomeForm
+        open={showIncomeForm}
+        onClose={() => {
+          setShowIncomeForm(false);
+          setEditingIncome(null);
+        }}
+        income={editingIncome}
+      />
+
+      <RecurringExpenseForm
+        open={showExpenseForm}
+        onClose={() => {
+          setShowExpenseForm(false);
+          setEditingExpense(null);
+        }}
+        expense={editingExpense}
+      />
+
+      <DeleteRecurringDialog
+        open={!!deletingItem}
+        onClose={() => setDeletingItem(null)}
+        item={deletingItem?.item || null}
+        type={deletingItem?.type || 'income'}
+      />
     </div>
   );
 };
