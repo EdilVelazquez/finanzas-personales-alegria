@@ -39,3 +39,24 @@ export interface Category {
   color: string;
   icon: string;
 }
+
+export interface RecurringIncome {
+  id: string;
+  name: string;
+  amount: number;
+  frequency: 'weekly' | 'biweekly' | 'monthly';
+  nextPaymentDate: Date;
+  userId: string;
+  createdAt: Date;
+}
+
+export interface RecurringExpense {
+  id: string;
+  name: string;
+  amount: number;
+  category: string;
+  frequency: 'weekly' | 'biweekly' | 'monthly';
+  nextPaymentDate: Date;
+  userId: string;
+  createdAt: Date;
+}

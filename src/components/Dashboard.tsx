@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Account, Transaction } from '@/types';
+import { Account, Transaction, RecurringIncome, RecurringExpense } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Doughnut, Line } from 'react-chartjs-2';
 import {
@@ -17,6 +17,10 @@ import {
   LineElement,
   Title
 } from 'chart.js';
+import BudgetCalculator from './Dashboard/BudgetCalculator';
+import RecurringItemsManager from './Dashboard/RecurringItemsManager';
+import { Button } from '@/components/ui/button';
+import { TrendingUp } from 'lucide-react';
 
 ChartJS.register(
   ArcElement,
@@ -33,7 +37,9 @@ const Dashboard: React.FC = () => {
   const { currentUser } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
-  const [monthlyData, setMonthlyData] = useState<any>({});
+  const [recurringIncomes, setRecurringIncomes] = useState<RecurringIncome[]>([]);
+  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
+  const [showRecurringItems, setShowRecurringItems] = useState(false);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -69,19 +75,53 @@ const Dashboard: React.FC = () => {
       setRecentTransactions(transactionsData);
     });
 
+    // Escuchar ingresos recurrentes
+    const recurringIncomesQuery = query(
+      collection(db, 'users', currentUser.uid, 'recurringIncomes'),
+      orderBy('nextPaymentDate', 'asc')
+    );
+
+    const unsubscribeRecurringIncomes = onSnapshot(recurringIncomesQuery, (snapshot) => {
+      const incomesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        nextPaymentDate: doc.data().nextPaymentDate?.toDate(),
+        createdAt: doc.data().createdAt?.toDate()
+      })) as RecurringIncome[];
+      setRecurringIncomes(incomesData);
+    });
+
+    // Escuchar gastos recurrentes
+    const recurringExpensesQuery = query(
+      collection(db, 'users', currentUser.uid, 'recurringExpenses'),
+      orderBy('nextPaymentDate', 'asc')
+    );
+
+    const unsubscribeRecurringExpenses = onSnapshot(recurringExpensesQuery, (snapshot) => {
+      const expensesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        nextPaymentDate: doc.data().nextPaymentDate?.toDate(),
+        createdAt: doc.data().createdAt?.toDate()
+      })) as RecurringExpense[];
+      setRecurringExpenses(expensesData);
+    });
+
     return () => {
       unsubscribeAccounts();
       unsubscribeTransactions();
+      unsubscribeRecurringIncomes();
+      unsubscribeRecurringExpenses();
     };
   }, [currentUser]);
 
-  const totalBalance = accounts.reduce((sum, account) => {
-    if (account.type === 'debit') {
-      return sum + account.balance;
-    } else {
-      return sum + (account.creditLimit || 0) - account.balance;
-    }
-  }, 0);
+  const totalDebitBalance = accounts
+    .filter(account => account.type === 'debit')
+    .reduce((sum, account) => sum + account.balance, 0);
+
+  const totalCreditAvailable = accounts
+    .filter(account => account.type === 'credit')
+    .reduce((sum, account) => sum + ((account.creditLimit || 0) - account.balance), 0);
 
   const totalDebt = accounts
     .filter(account => account.type === 'credit')
@@ -90,59 +130,75 @@ const Dashboard: React.FC = () => {
   const chartData = {
     labels: ['Débito', 'Crédito Disponible', 'Deuda'],
     datasets: [{
-      data: [
-        accounts.filter(a => a.type === 'debit').reduce((s, a) => s + a.balance, 0),
-        accounts.filter(a => a.type === 'credit').reduce((s, a) => s + ((a.creditLimit || 0) - a.balance), 0),
-        totalDebt
-      ],
+      data: [totalDebitBalance, totalCreditAvailable, totalDebt],
       backgroundColor: ['#10b981', '#3b82f6', '#ef4444'],
       borderWidth: 2,
       borderColor: '#ffffff'
     }]
   };
 
+  // Funciones placeholder para manejar ingresos y gastos recurrentes
+  const handleAddIncome = () => {
+    console.log('Agregar ingreso recurrente');
+  };
+
+  const handleAddExpense = () => {
+    console.log('Agregar gasto recurrente');
+  };
+
+  const handleEditIncome = (income: RecurringIncome) => {
+    console.log('Editar ingreso:', income);
+  };
+
+  const handleEditExpense = (expense: RecurringExpense) => {
+    console.log('Editar gasto:', expense);
+  };
+
+  const handleDeleteIncome = (income: RecurringIncome) => {
+    console.log('Eliminar ingreso:', income);
+  };
+
+  const handleDeleteExpense = (expense: RecurringExpense) => {
+    console.log('Eliminar gasto:', expense);
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-        <p className="text-gray-600">Resumen de tus finanzas</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
+          <p className="text-gray-600">Resumen de tus finanzas</p>
+        </div>
+        <Button 
+          onClick={() => setShowRecurringItems(!showRecurringItems)}
+          variant="outline"
+        >
+          <TrendingUp className="h-4 w-4 mr-2" />
+          {showRecurringItems ? 'Ocultar Recurrentes' : 'Gestionar Recurrentes'}
+        </Button>
       </div>
 
-      {/* Tarjetas de resumen */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Balance Total</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              ${totalBalance.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Calculadora de presupuesto con balances separados */}
+      <BudgetCalculator
+        totalDebitBalance={totalDebitBalance}
+        totalCreditAvailable={totalCreditAvailable}
+        recurringIncomes={recurringIncomes}
+        recurringExpenses={recurringExpenses}
+      />
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Deudas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              ${totalDebt.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Cuentas Activas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {accounts.length}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Gestión de ingresos y gastos recurrentes */}
+      {showRecurringItems && (
+        <RecurringItemsManager
+          recurringIncomes={recurringIncomes}
+          recurringExpenses={recurringExpenses}
+          onAddIncome={handleAddIncome}
+          onAddExpense={handleAddExpense}
+          onEditIncome={handleEditIncome}
+          onEditExpense={handleEditExpense}
+          onDeleteIncome={handleDeleteIncome}
+          onDeleteExpense={handleDeleteExpense}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gráfico de distribución */}
