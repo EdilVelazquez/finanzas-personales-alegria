@@ -142,14 +142,14 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
           <div className="space-y-2">
             <Label>Tipo</Label>
             <Select
-              value={filters.type || ''}
-              onValueChange={(value) => handleFilterChange('type', value || undefined)}
+              value={filters.type || 'all'}
+              onValueChange={(value) => handleFilterChange('type', value === 'all' ? undefined : value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="income">Ingresos</SelectItem>
                 <SelectItem value="expense">Gastos</SelectItem>
               </SelectContent>
@@ -160,14 +160,14 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
           <div className="space-y-2">
             <Label>Categoría</Label>
             <Select
-              value={filters.category || ''}
-              onValueChange={(value) => handleFilterChange('category', value || undefined)}
+              value={filters.category || 'all'}
+              onValueChange={(value) => handleFilterChange('category', value === 'all' ? undefined : value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todas" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas</SelectItem>
+                <SelectItem value="all">Todas</SelectItem>
                 {defaultCategories.map((category) => (
                   <SelectItem key={category.name} value={category.name}>
                     <div className="flex items-center gap-2">
@@ -184,14 +184,14 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
           <div className="space-y-2">
             <Label>Cuenta</Label>
             <Select
-              value={filters.accountId || ''}
-              onValueChange={(value) => handleFilterChange('accountId', value || undefined)}
+              value={filters.accountId || 'all'}
+              onValueChange={(value) => handleFilterChange('accountId', value === 'all' ? undefined : value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todas" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas</SelectItem>
+                <SelectItem value="all">Todas</SelectItem>
                 {accounts.map((account) => (
                   <SelectItem key={account.id} value={account.id}>
                     {account.name}
