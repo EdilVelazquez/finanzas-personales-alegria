@@ -94,25 +94,50 @@ const TransactionsPage: React.FC = () => {
     };
   }, [currentUser, filters]);
 
-  // Función para calcular el saldo acumulado
+  // Función para calcular el saldo acumulado por cuenta
   const calculateRunningBalance = () => {
     // Ordenar transacciones por fecha ascendente para calcular saldo correcto
     const sortedTransactions = [...transactions].sort((a, b) => 
       a.date.getTime() - b.date.getTime()
     );
 
-    let runningBalance = 0;
-    return sortedTransactions.map(transaction => {
-      if (transaction.type === 'income') {
-        runningBalance += transaction.amount;
-      } else {
-        runningBalance -= transaction.amount;
+    // Crear un mapa para mantener el saldo por cuenta
+    const accountBalances: { [accountId: string]: number } = {};
+    
+    // Inicializar saldos con el balance actual de cada cuenta
+    accounts.forEach(account => {
+      accountBalances[account.id] = account.balance;
+    });
+
+    // Calcular el saldo histórico trabajando hacia atrás desde el presente
+    const transactionsWithBalance = sortedTransactions.map(transaction => {
+      const account = accounts.find(acc => acc.id === transaction.accountId);
+      if (!account) {
+        return {
+          ...transaction,
+          accountBalance: 0
+        };
       }
+
+      // El saldo después de esta transacción específica
+      let balanceAfterTransaction: number;
+      
+      if (transaction.type === 'income') {
+        balanceAfterTransaction = (accountBalances[transaction.accountId] || account.balance) + transaction.amount;
+      } else {
+        balanceAfterTransaction = (accountBalances[transaction.accountId] || account.balance) - transaction.amount;
+      }
+      
+      accountBalances[transaction.accountId] = balanceAfterTransaction;
+
       return {
         ...transaction,
-        runningBalance
+        accountBalance: balanceAfterTransaction
       };
-    }).reverse(); // Volver a ordenar por fecha descendente para mostrar
+    });
+
+    // Revertir para mostrar las más recientes primero
+    return transactionsWithBalance.reverse();
   };
 
   const transactionsWithBalance = calculateRunningBalance();
@@ -252,7 +277,7 @@ const TransactionsPage: React.FC = () => {
                   <TableHead>Categoría</TableHead>
                   <TableHead>Cuenta</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
-                  <TableHead className="text-right">Saldo</TableHead>
+                  <TableHead className="text-right">Saldo de Cuenta</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -284,9 +309,9 @@ const TransactionsPage: React.FC = () => {
                       ${transaction.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell className={`text-right font-medium ${
-                      transaction.runningBalance >= 0 ? 'text-green-600' : 'text-red-600'
+                      transaction.accountBalance >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      ${transaction.runningBalance.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      ${transaction.accountBalance.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
