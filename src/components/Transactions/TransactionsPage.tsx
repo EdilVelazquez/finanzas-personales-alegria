@@ -104,12 +104,21 @@ const TransactionsPage: React.FC = () => {
     // Crear un mapa para mantener el saldo por cuenta
     const accountBalances: { [accountId: string]: number } = {};
     
-    // Inicializar saldos con el balance actual de cada cuenta
+    // Calcular el saldo inicial para cada cuenta (saldo actual - todas las transacciones)
     accounts.forEach(account => {
-      accountBalances[account.id] = account.balance;
+      // Obtener todas las transacciones de esta cuenta
+      const accountTransactions = sortedTransactions.filter(t => t.accountId === account.id);
+      
+      // Calcular el efecto total de todas las transacciones
+      const totalEffect = accountTransactions.reduce((sum, t) => {
+        return sum + (t.type === 'income' ? t.amount : -t.amount);
+      }, 0);
+      
+      // El saldo inicial es el saldo actual menos el efecto de todas las transacciones
+      accountBalances[account.id] = account.balance - totalEffect;
     });
 
-    // Calcular el saldo histórico trabajando hacia atrás desde el presente
+    // Calcular el saldo después de cada transacción
     const transactionsWithBalance = sortedTransactions.map(transaction => {
       const account = accounts.find(acc => acc.id === transaction.accountId);
       if (!account) {
@@ -119,20 +128,16 @@ const TransactionsPage: React.FC = () => {
         };
       }
 
-      // El saldo después de esta transacción específica
-      let balanceAfterTransaction: number;
-      
+      // Aplicar la transacción al saldo de la cuenta
       if (transaction.type === 'income') {
-        balanceAfterTransaction = (accountBalances[transaction.accountId] || account.balance) + transaction.amount;
+        accountBalances[transaction.accountId] += transaction.amount;
       } else {
-        balanceAfterTransaction = (accountBalances[transaction.accountId] || account.balance) - transaction.amount;
+        accountBalances[transaction.accountId] -= transaction.amount;
       }
-      
-      accountBalances[transaction.accountId] = balanceAfterTransaction;
 
       return {
         ...transaction,
-        accountBalance: balanceAfterTransaction
+        accountBalance: accountBalances[transaction.accountId]
       };
     });
 
