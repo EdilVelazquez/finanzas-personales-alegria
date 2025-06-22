@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, query, onSnapshot, orderBy, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Account, Transaction } from '@/types';
+import { Account, Transaction, RecurringExpense } from '@/types';
 import { defaultCategories } from '@/data/categories';
 import {
   Dialog,
@@ -39,8 +38,9 @@ import { useForm } from 'react-hook-form';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatCurrencyWithSymbol } from '@/lib/formatCurrency';
 
 interface TransactionFormProps {
   open: boolean;
@@ -56,12 +56,14 @@ interface FormData {
   description: string;
   category: string;
   accountId: string;
+  recurringExpenseId?: string;
 }
 
 const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transaction, accounts }) => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
 
   const form = useForm<FormData>({
     defaultValues: {
@@ -71,11 +73,56 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
       description: '',
       category: '',
       accountId: '',
+      recurringExpenseId: '',
     },
   });
 
   const watchType = form.watch('type');
   const watchAccountId = form.watch('accountId');
+  const watchRecurringExpenseId = form.watch('recurringExpenseId');
+
+  // Load recurring expenses
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const recurringExpensesQuery = query(
+      collection(db, 'users', currentUser.uid, 'recurringExpenses'),
+      orderBy('nextPaymentDate', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(recurringExpensesQuery, (snapshot) => {
+      const expensesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        nextPaymentDate: doc.data().nextPaymentDate?.toDate(),
+        createdAt: doc.data().createdAt?.toDate()
+      })) as RecurringExpense[];
+      
+      // Only show upcoming expenses (within next 30 days)
+      const now = new Date();
+      const thirtyDaysFromNow = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
+      const upcomingExpenses = expensesData.filter(expense => 
+        expense.nextPaymentDate >= now && expense.nextPaymentDate <= thirtyDaysFromNow
+      );
+      
+      setRecurringExpenses(upcomingExpenses);
+    });
+
+    return unsubscribe;
+  }, [currentUser]);
+
+  // Auto-fill form when recurring expense is selected
+  useEffect(() => {
+    if (watchRecurringExpenseId && recurringExpenses.length > 0) {
+      const selectedExpense = recurringExpenses.find(exp => exp.id === watchRecurringExpenseId);
+      if (selectedExpense) {
+        form.setValue('type', 'expense');
+        form.setValue('amount', selectedExpense.amount.toString());
+        form.setValue('description', `Pago adelantado: ${selectedExpense.name}`);
+        form.setValue('category', selectedExpense.category);
+      }
+    }
+  }, [watchRecurringExpenseId, recurringExpenses, form]);
 
   useEffect(() => {
     if (transaction) {
@@ -86,6 +133,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         description: transaction.description,
         category: transaction.category,
         accountId: transaction.accountId,
+        recurringExpenseId: '',
       });
     } else {
       form.reset({
@@ -95,6 +143,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         description: '',
         category: '',
         accountId: '',
+        recurringExpenseId: '',
       });
     }
   }, [transaction, form]);
@@ -147,6 +196,31 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
 
     await updateDoc(doc(db, 'users', currentUser!.uid, 'accounts', accountId), {
       balance: newBalance
+    });
+  };
+
+  const updateRecurringExpenseNextPayment = async (recurringExpenseId: string) => {
+    const expense = recurringExpenses.find(exp => exp.id === recurringExpenseId);
+    if (!expense) return;
+
+    // Calculate next payment date based on frequency
+    const currentDate = expense.nextPaymentDate;
+    let nextPaymentDate = new Date(currentDate);
+
+    switch (expense.frequency) {
+      case 'weekly':
+        nextPaymentDate.setDate(nextPaymentDate.getDate() + 7);
+        break;
+      case 'biweekly':
+        nextPaymentDate.setDate(nextPaymentDate.getDate() + 14);
+        break;
+      case 'monthly':
+        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+        break;
+    }
+
+    await updateDoc(doc(db, 'users', currentUser!.uid, 'recurringExpenses', recurringExpenseId), {
+      nextPaymentDate: Timestamp.fromDate(nextPaymentDate)
     });
   };
 
@@ -218,10 +292,19 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         // Actualizar el saldo de la cuenta
         await updateAccountBalance(data.accountId, amount, data.type);
         
-        toast({
-          title: 'Transacción creada',
-          description: 'La transacción se ha registrado correctamente.',
-        });
+        // Si se seleccionó un pago recurrente, actualizar su próxima fecha de pago
+        if (data.recurringExpenseId) {
+          await updateRecurringExpenseNextPayment(data.recurringExpenseId);
+          toast({
+            title: 'Pago adelantado registrado',
+            description: 'El pago recurrente ha sido marcado como saldado y se actualizó la próxima fecha.',
+          });
+        } else {
+          toast({
+            title: 'Transacción creada',
+            description: 'La transacción se ha registrado correctamente.',
+          });
+        }
       }
 
       onClose();
@@ -238,6 +321,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
   };
 
   const selectedAccount = accounts.find(acc => acc.id === watchAccountId);
+  const selectedRecurringExpense = recurringExpenses.find(exp => exp.id === watchRecurringExpenseId);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -250,6 +334,53 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Selector de pago recurrente - Solo para gastos y cuando no está editando */}
+            {!transaction && watchType === 'expense' && recurringExpenses.length > 0 && (
+              <FormField
+                control={form.control}
+                name="recurringExpenseId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Adelantar pago programado (opcional)
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={loading}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona un pago para adelantar" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">Ninguno - transacción nueva</SelectItem>
+                        {recurringExpenses.map((expense) => (
+                          <SelectItem key={expense.id} value={expense.id}>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center justify-between w-full">
+                                <span className="font-medium">{expense.name}</span>
+                                <span className="text-sm text-green-600">
+                                  {formatCurrencyWithSymbol(expense.amount)}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Vence: {expense.nextPaymentDate.toLocaleDateString('es-ES')}
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedRecurringExpense && (
+                      <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                        💡 Al confirmar, este pago se marcará como saldado y la próxima fecha se actualizará automáticamente.
+                      </div>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <FormField
               control={form.control}
               name="type"
@@ -417,9 +548,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
                   {selectedAccount && (
                     <div className="text-sm text-gray-600 mt-1">
                       {selectedAccount.type === 'debit' ? (
-                        `Saldo disponible: $${selectedAccount.balance.toLocaleString('es-ES', { minimumFractionDigits: 2 })}`
+                        `Saldo disponible: ${formatCurrencyWithSymbol(selectedAccount.balance)}`
                       ) : (
-                        `Crédito disponible: $${((selectedAccount.creditLimit || 0) - selectedAccount.balance).toLocaleString('es-ES', { minimumFractionDigits: 2 })}`
+                        `Crédito disponible: ${formatCurrencyWithSymbol((selectedAccount.creditLimit || 0) - selectedAccount.balance)}`
                       )}
                     </div>
                   )}
