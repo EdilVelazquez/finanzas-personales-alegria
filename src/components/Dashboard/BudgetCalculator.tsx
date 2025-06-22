@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, DollarSign, TrendingDown, TrendingUp } from 'lucide-react';
+import { Calendar, DollarSign, TrendingDown, TrendingUp, AlertTriangle } from 'lucide-react';
 import { RecurringIncome, RecurringExpense } from '@/types';
 import { formatCurrencyWithSymbol } from '@/lib/formatCurrency';
 
@@ -32,6 +33,15 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
     return Math.max(1, diffDays);
   };
 
+  const getUpcomingExpensesUntilNextIncome = () => {
+    const nextIncomeDate = getNextPaymentDate(recurringIncomes);
+    if (!nextIncomeDate) return 0;
+
+    return recurringExpenses
+      .filter(expense => expense.nextPaymentDate <= nextIncomeDate)
+      .reduce((total, expense) => total + expense.amount, 0);
+  };
+
   const getMonthlyRecurringIncome = () => {
     return recurringIncomes.reduce((total, income) => {
       switch (income.frequency) {
@@ -58,8 +68,11 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
   const monthlyIncome = getMonthlyRecurringIncome();
   const monthlyExpenses = getMonthlyRecurringExpenses();
   const netMonthlyIncome = monthlyIncome - monthlyExpenses;
-  const availableMoney = totalDebitBalance + totalCreditAvailable;
-  const dailyBudget = availableMoney / daysUntilPayment;
+  const upcomingExpenses = getUpcomingExpensesUntilNextIncome();
+  
+  // Dinero libre = Solo cuentas de débito - pagos próximos programados
+  const freeMoney = totalDebitBalance - upcomingExpenses;
+  const dailyBudget = Math.max(0, freeMoney / daysUntilPayment);
 
   const nextPaymentDate = getNextPaymentDate(recurringIncomes);
   const nextExpenseDate = getNextPaymentDate(recurringExpenses);
@@ -82,28 +95,44 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Crédito Disponible (TCS)</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">Pagos Próximos</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {formatCurrencyWithSymbol(totalCreditAvailable)}
+            <div className="text-2xl font-bold text-red-600">
+              {formatCurrencyWithSymbol(upcomingExpenses)}
             </div>
-            <p className="text-xs text-gray-500 mt-1">Línea de crédito disponible</p>
+            <p className="text-xs text-gray-500 mt-1">Hasta el próximo ingreso</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Disponible</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">Dinero Libre</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">
-              {formatCurrencyWithSymbol(availableMoney)}
+            <div className={`text-2xl font-bold ${freeMoney >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {formatCurrencyWithSymbol(freeMoney)}
             </div>
-            <p className="text-xs text-gray-500 mt-1">Débito + Crédito disponible</p>
+            <p className="text-xs text-gray-500 mt-1">Después de pagos programados</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Crédito disponible como información adicional */}
+      <Card className="border-blue-200 bg-blue-50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-blue-700 flex items-center gap-2">
+            <DollarSign className="h-4 w-4" />
+            Crédito Disponible (TCS)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-xl font-bold text-blue-600">
+            {formatCurrencyWithSymbol(totalCreditAvailable)}
+          </div>
+          <p className="text-xs text-blue-600 mt-1">Línea de crédito disponible (no incluida en presupuesto diario)</p>
+        </CardContent>
+      </Card>
 
       {/* Presupuesto diario */}
       <Card>
@@ -116,15 +145,28 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-3xl font-bold text-green-600">
-                  {formatCurrencyWithSymbol(dailyBudget)}
+              {freeMoney >= 0 ? (
+                <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <div className="text-3xl font-bold text-green-600">
+                    {formatCurrencyWithSymbol(dailyBudget)}
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">Límite diario de gastos</p>
+                  <p className="text-xs text-gray-500">
+                    Basado en dinero libre para {daysUntilPayment} días
+                  </p>
                 </div>
-                <p className="text-sm text-gray-600 mt-1">Límite diario de gastos</p>
-                <p className="text-xs text-gray-500">
-                  Basado en {daysUntilPayment} días hasta el próximo pago
-                </p>
-              </div>
+              ) : (
+                <div className="text-center p-4 bg-red-50 rounded-lg">
+                  <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-red-600" />
+                  <div className="text-xl font-bold text-red-600">
+                    Sin presupuesto disponible
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">Los pagos programados exceden el saldo de débito</p>
+                  <p className="text-xs text-red-500">
+                    Déficit: {formatCurrencyWithSymbol(Math.abs(freeMoney))}
+                  </p>
+                </div>
+              )}
               
               {nextPaymentDate && (
                 <div className="p-3 bg-blue-50 rounded-lg">
