@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Calendar, DollarSign, Edit, Trash2 } from 'lucide-react';
 import { RecurringIncome, RecurringExpense } from '@/types';
+import { formatCurrencyWithSymbol } from '@/lib/formatCurrency';
 
 interface RecurringItemsManagerProps {
   recurringIncomes: RecurringIncome[];
@@ -77,7 +78,7 @@ const RecurringItemsManager: React.FC<RecurringItemsManagerProps> = ({
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-bold text-green-600">
-                      ${income.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      {formatCurrencyWithSymbol(income.amount)}
                     </span>
                     <span className="text-gray-600">{getFrequencyText(income.frequency)}</span>
                   </div>
@@ -138,7 +139,7 @@ const RecurringItemsManager: React.FC<RecurringItemsManagerProps> = ({
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-bold text-red-600">
-                      ${expense.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      {formatCurrencyWithSymbol(expense.amount)}
                     </span>
                     <span className="text-gray-600">{getFrequencyText(expense.frequency)}</span>
                   </div>

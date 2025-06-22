@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
@@ -11,6 +10,7 @@ import AccountForm from './AccountForm';
 import DeleteAccountDialog from './DeleteAccountDialog';
 import TransferDialog from './TransferDialog';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrencyWithSymbol } from '@/lib/formatCurrency';
 
 const AccountsPage: React.FC = () => {
   const { currentUser } = useAuth();
@@ -107,10 +107,9 @@ const AccountsPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              ${accounts
+              {formatCurrencyWithSymbol(accounts
                 .filter(a => a.type === 'debit')
-                .reduce((sum, a) => sum + a.balance, 0)
-                .toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                .reduce((sum, a) => sum + a.balance, 0))}
             </div>
           </CardContent>
         </Card>
@@ -121,10 +120,9 @@ const AccountsPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              ${accounts
+              {formatCurrencyWithSymbol(accounts
                 .filter(a => a.type === 'credit')
-                .reduce((sum, a) => sum + ((a.creditLimit || 0) - a.balance), 0)
-                .toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                .reduce((sum, a) => sum + ((a.creditLimit || 0) - a.balance), 0))}
             </div>
           </CardContent>
         </Card>
@@ -135,10 +133,9 @@ const AccountsPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              ${accounts
+              {formatCurrencyWithSymbol(accounts
                 .filter(a => a.type === 'credit')
-                .reduce((sum, a) => sum + a.balance, 0)
-                .toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                .reduce((sum, a) => sum + a.balance, 0))}
             </div>
           </CardContent>
         </Card>
@@ -188,7 +185,7 @@ const AccountsPage: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Saldo:</span>
                   <span className={`font-bold ${getBalanceColor(account)}`}>
-                    ${account.balance.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                    {formatCurrencyWithSymbol(account.balance)}
                   </span>
                 </div>
               ) : (
@@ -196,19 +193,19 @@ const AccountsPage: React.FC = () => {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Límite:</span>
                     <span className="font-medium">
-                      ${(account.creditLimit || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      {formatCurrencyWithSymbol(account.creditLimit || 0)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Usado:</span>
                     <span className="font-medium text-red-600">
-                      ${account.balance.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      {formatCurrencyWithSymbol(account.balance)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Disponible:</span>
                     <span className={`font-bold ${getBalanceColor(account)}`}>
-                      ${getAvailableBalance(account).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      {formatCurrencyWithSymbol(getAvailableBalance(account))}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2 mt-2">

@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import TransactionForm from './TransactionForm';
 import DeleteTransactionDialog from './DeleteTransactionDialog';
 import TransactionFilters, { TransactionFilters as TTransactionFilters } from './TransactionFilters';
+import { formatCurrencyWithSymbol } from '@/lib/formatCurrency';
 import {
   Table,
   TableBody,
@@ -109,18 +110,9 @@ const TransactionsPage: React.FC = () => {
     // Crear un mapa para mantener el saldo por cuenta
     const accountBalances: { [accountId: string]: number } = {};
     
-    // Calcular el saldo inicial para cada cuenta (saldo actual - todas las transacciones)
+    // Inicializar con el saldo inicial de cada cuenta (como si fuera una transacción inicial)
     accounts.forEach(account => {
-      // Obtener todas las transacciones de esta cuenta
-      const accountTransactions = sortedTransactions.filter(t => t.accountId === account.id);
-      
-      // Calcular el efecto total de todas las transacciones
-      const totalEffect = accountTransactions.reduce((sum, t) => {
-        return sum + (t.type === 'income' ? t.amount : -t.amount);
-      }, 0);
-      
-      // El saldo inicial es el saldo actual menos el efecto de todas las transacciones
-      accountBalances[account.id] = account.balance - totalEffect;
+      accountBalances[account.id] = account.balance;
     });
 
     // Calcular el saldo después de cada transacción
@@ -245,7 +237,7 @@ const TransactionsPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-lg sm:text-2xl font-bold text-green-600">
-              ${getTotalIncome().toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+              {formatCurrencyWithSymbol(getTotalIncome())}
             </div>
           </CardContent>
         </Card>
@@ -256,7 +248,7 @@ const TransactionsPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-lg sm:text-2xl font-bold text-red-600">
-              ${getTotalExpenses().toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+              {formatCurrencyWithSymbol(getTotalExpenses())}
             </div>
           </CardContent>
         </Card>
@@ -267,7 +259,7 @@ const TransactionsPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className={`text-lg sm:text-2xl font-bold ${getBalance() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              ${getBalance().toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+              {formatCurrencyWithSymbol(getBalance())}
             </div>
           </CardContent>
         </Card>
@@ -329,12 +321,12 @@ const TransactionsPage: React.FC = () => {
                           transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
                         }`}>
                           {transaction.type === 'income' ? '+' : '-'}
-                          ${transaction.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                          {formatCurrencyWithSymbol(transaction.amount)}
                         </span>
                         <span className={`text-sm font-medium ${
                           transaction.accountBalance >= 0 ? 'text-green-600' : 'text-red-600'
                         }`}>
-                          Saldo: ${transaction.accountBalance.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                          Saldo: {formatCurrencyWithSymbol(transaction.accountBalance)}
                         </span>
                       </div>
                     </div>
@@ -382,12 +374,12 @@ const TransactionsPage: React.FC = () => {
                           transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
                         }`}>
                           {transaction.type === 'income' ? '+' : '-'}
-                          ${transaction.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                          {formatCurrencyWithSymbol(transaction.amount)}
                         </TableCell>
                         <TableCell className={`text-right font-medium text-xs ${
                           transaction.accountBalance >= 0 ? 'text-green-600' : 'text-red-600'
                         }`}>
-                          ${transaction.accountBalance.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                          {formatCurrencyWithSymbol(transaction.accountBalance)}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">

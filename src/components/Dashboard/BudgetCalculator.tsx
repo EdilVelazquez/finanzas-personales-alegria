@@ -1,8 +1,8 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, DollarSign, TrendingDown, TrendingUp } from 'lucide-react';
 import { RecurringIncome, RecurringExpense } from '@/types';
+import { formatCurrencyWithSymbol } from '@/lib/formatCurrency';
 
 interface BudgetCalculatorProps {
   totalDebitBalance: number;
@@ -74,7 +74,7 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              ${totalDebitBalance.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+              {formatCurrencyWithSymbol(totalDebitBalance)}
             </div>
             <p className="text-xs text-gray-500 mt-1">Dinero real disponible</p>
           </CardContent>
@@ -86,7 +86,7 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              ${totalCreditAvailable.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+              {formatCurrencyWithSymbol(totalCreditAvailable)}
             </div>
             <p className="text-xs text-gray-500 mt-1">Línea de crédito disponible</p>
           </CardContent>
@@ -98,7 +98,7 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600">
-              ${availableMoney.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+              {formatCurrencyWithSymbol(availableMoney)}
             </div>
             <p className="text-xs text-gray-500 mt-1">Débito + Crédito disponible</p>
           </CardContent>
@@ -118,7 +118,7 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
             <div className="space-y-4">
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <div className="text-3xl font-bold text-green-600">
-                  ${dailyBudget.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                  {formatCurrencyWithSymbol(dailyBudget)}
                 </div>
                 <p className="text-sm text-gray-600 mt-1">Límite diario de gastos</p>
                 <p className="text-xs text-gray-500">
@@ -151,20 +151,20 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Ingresos fijos:</span>
                     <span className="font-medium text-green-600">
-                      +${monthlyIncome.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      +{formatCurrencyWithSymbol(monthlyIncome)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Gastos recurrentes:</span>
                     <span className="font-medium text-red-600">
-                      -${monthlyExpenses.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      -{formatCurrencyWithSymbol(monthlyExpenses)}
                     </span>
                   </div>
                   <hr className="my-2" />
                   <div className="flex justify-between">
                     <span className="font-medium text-gray-700">Neto mensual:</span>
                     <span className={`font-bold ${netMonthlyIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      ${netMonthlyIncome.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      {formatCurrencyWithSymbol(netMonthlyIncome)}
                     </span>
                   </div>
                 </div>
