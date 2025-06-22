@@ -4,6 +4,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { LogOut, Menu, Home, CreditCard, ArrowUpDown, BarChart3 } from 'lucide-react';
 import { useState } from 'react';
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -22,31 +27,67 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange }) 
     { id: 'reports', name: 'Reportes', icon: BarChart3 }
   ];
 
+  const handleMenuItemClick = (itemId: string) => {
+    onPageChange(itemId);
+    setSidebarOpen(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+      {/* Header - Optimizado para móvil */}
+      <header className="bg-white shadow-sm border-b sticky top-0 z-40">
+        <div className="px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-14 sm:h-16">
             <div className="flex items-center">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-              <h1 className="text-xl font-bold text-blue-600 ml-2">FinanzApp</h1>
+              {/* Menú hamburguesa para móvil */}
+              <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="lg:hidden p-2"
+                  >
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-64 p-0">
+                  <div className="p-6 border-b">
+                    <h2 className="text-lg font-bold text-blue-600">FinanzApp</h2>
+                  </div>
+                  <nav className="mt-4">
+                    {menuItems.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => handleMenuItemClick(item.id)}
+                          className={`
+                            w-full flex items-center px-6 py-4 text-left transition-colors
+                            ${currentPage === item.id 
+                              ? 'bg-blue-50 border-r-2 border-blue-500 text-blue-700' 
+                              : 'text-gray-600 hover:bg-gray-50'
+                            }
+                          `}
+                        >
+                          <Icon className="h-5 w-5 mr-3" />
+                          {item.name}
+                        </button>
+                      );
+                    })}
+                  </nav>
+                </SheetContent>
+              </Sheet>
+              
+              <h1 className="text-lg sm:text-xl font-bold text-blue-600 ml-2">FinanzApp</h1>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600 hidden sm:block">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <span className="text-xs sm:text-sm text-gray-600 hidden sm:block truncate max-w-32 lg:max-w-none">
                 {currentUser?.email}
               </span>
-              <Button variant="outline" size="sm" onClick={logout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Cerrar Sesión
+              <Button variant="outline" size="sm" onClick={logout} className="text-xs sm:text-sm px-2 sm:px-4">
+                <LogOut className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Cerrar Sesión</span>
               </Button>
             </div>
           </div>
@@ -54,22 +95,15 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange }) 
       </header>
 
       <div className="flex">
-        {/* Sidebar */}
-        <aside className={`
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
-          lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-64 
-          bg-white shadow-lg transition-transform duration-300 ease-in-out lg:transition-none
-        `}>
+        {/* Sidebar desktop */}
+        <aside className="hidden lg:block w-64 bg-white shadow-lg">
           <nav className="mt-8">
             {menuItems.map((item) => {
               const Icon = item.icon;
               return (
                 <button
                   key={item.id}
-                  onClick={() => {
-                    onPageChange(item.id);
-                    setSidebarOpen(false);
-                  }}
+                  onClick={() => onPageChange(item.id)}
                   className={`
                     w-full flex items-center px-6 py-3 text-left transition-colors
                     ${currentPage === item.id 
@@ -86,21 +120,13 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange }) 
           </nav>
         </aside>
 
-        {/* Main Content */}
-        <main className="flex-1 lg:ml-0">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Main Content - Responsivo */}
+        <main className="flex-1 w-full min-w-0">
+          <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
             {children}
           </div>
         </main>
       </div>
-
-      {/* Overlay para cerrar sidebar en móvil */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
     </div>
   );
 };

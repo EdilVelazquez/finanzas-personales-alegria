@@ -62,17 +62,17 @@ const DeleteRecurringDialog: React.FC<DeleteRecurringDialogProps> = ({
 
   return (
     <AlertDialog open={open} onOpenChange={onClose}>
-      <AlertDialogContent>
+      <AlertDialogContent className="mx-4 max-w-md">
         <AlertDialogHeader>
-          <AlertDialogTitle>
+          <AlertDialogTitle className="text-base sm:text-lg">
             {type === 'income' ? 'Eliminar Ingreso Fijo' : 'Eliminar Gasto Recurrente'}
           </AlertDialogTitle>
-          <AlertDialogDescription>
+          <AlertDialogDescription className="text-sm">
             ¿Estás seguro de que quieres eliminar "{item?.name}"? Esta acción no se puede deshacer.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
+        <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+          <AlertDialogCancel disabled={loading} className="mt-2 sm:mt-0">Cancelar</AlertDialogCancel>
           <AlertDialogAction 
             onClick={handleDelete}
             disabled={loading}

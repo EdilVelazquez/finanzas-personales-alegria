@@ -23,6 +23,11 @@ import RecurringExpenseForm from './Dashboard/RecurringExpenseForm';
 import DeleteRecurringDialog from './Dashboard/DeleteRecurringDialog';
 import { Button } from '@/components/ui/button';
 import { TrendingUp } from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
 ChartJS.register(
   ArcElement,
@@ -179,22 +184,38 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-          <p className="text-gray-600">Resumen de tus finanzas</p>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header responsivo */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Dashboard</h2>
+          <p className="text-sm sm:text-base text-gray-600">Resumen de tus finanzas</p>
         </div>
-        <Button 
-          onClick={() => setShowRecurringItems(!showRecurringItems)}
-          variant="outline"
-        >
-          <TrendingUp className="h-4 w-4 mr-2" />
-          {showRecurringItems ? 'Ocultar Recurrentes' : 'Gestionar Recurrentes'}
-        </Button>
+        <Sheet open={showRecurringItems} onOpenChange={setShowRecurringItems}>
+          <SheetTrigger asChild>
+            <Button variant="outline" className="w-full sm:w-auto">
+              <TrendingUp className="h-4 w-4 mr-2" />
+              {showRecurringItems ? 'Ocultar Recurrentes' : 'Gestionar Recurrentes'}
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="h-[90vh] overflow-y-auto">
+            <div className="py-4">
+              <RecurringItemsManager
+                recurringIncomes={recurringIncomes}
+                recurringExpenses={recurringExpenses}
+                onAddIncome={handleAddIncome}
+                onAddExpense={handleAddExpense}
+                onEditIncome={handleEditIncome}
+                onEditExpense={handleEditExpense}
+                onDeleteIncome={handleDeleteIncome}
+                onDeleteExpense={handleDeleteExpense}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
-      {/* Calculadora de presupuesto con balances separados */}
+      {/* Calculadora de presupuesto responsiva */}
       <BudgetCalculator
         totalDebitBalance={totalDebitBalance}
         totalCreditAvailable={totalCreditAvailable}
@@ -202,28 +223,14 @@ const Dashboard: React.FC = () => {
         recurringExpenses={recurringExpenses}
       />
 
-      {/* Gestión de ingresos y gastos recurrentes */}
-      {showRecurringItems && (
-        <RecurringItemsManager
-          recurringIncomes={recurringIncomes}
-          recurringExpenses={recurringExpenses}
-          onAddIncome={handleAddIncome}
-          onAddExpense={handleAddExpense}
-          onEditIncome={handleEditIncome}
-          onEditExpense={handleEditExpense}
-          onDeleteIncome={handleDeleteIncome}
-          onDeleteExpense={handleDeleteExpense}
-        />
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Gráfico de distribución */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        {/* Gráfico de distribución - Responsivo */}
         <Card>
           <CardHeader>
-            <CardTitle>Distribución de Saldos</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Distribución de Saldos</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64 flex items-center justify-center">
+            <div className="h-48 sm:h-64 flex items-center justify-center">
               {accounts.length > 0 ? (
                 <Doughnut 
                   data={chartData} 
@@ -232,34 +239,39 @@ const Dashboard: React.FC = () => {
                     maintainAspectRatio: false,
                     plugins: {
                       legend: {
-                        position: 'bottom'
+                        position: 'bottom',
+                        labels: {
+                          font: {
+                            size: window.innerWidth < 640 ? 10 : 12
+                          }
+                        }
                       }
                     }
                   }}
                 />
               ) : (
-                <p className="text-gray-500">No hay datos para mostrar</p>
+                <p className="text-gray-500 text-sm">No hay datos para mostrar</p>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Transacciones recientes */}
+        {/* Transacciones recientes - Responsivo */}
         <Card>
           <CardHeader>
-            <CardTitle>Transacciones Recientes</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Transacciones Recientes</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {recentTransactions.length > 0 ? (
                 recentTransactions.map((transaction) => (
                   <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-sm">{transaction.description}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">{transaction.description}</p>
                       <p className="text-xs text-gray-500">{transaction.category}</p>
                     </div>
-                    <div className="text-right">
-                      <p className={`font-medium ${
+                    <div className="text-right ml-4 flex-shrink-0">
+                      <p className={`font-medium text-sm ${
                         transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
                       }`}>
                         {transaction.type === 'income' ? '+' : '-'}
@@ -272,25 +284,25 @@ const Dashboard: React.FC = () => {
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500 text-center py-4">No hay transacciones recientes</p>
+                <p className="text-gray-500 text-center py-4 text-sm">No hay transacciones recientes</p>
               )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Lista de cuentas */}
+      {/* Lista de cuentas - Grid responsivo */}
       <Card>
         <CardHeader>
-          <CardTitle>Mis Cuentas</CardTitle>
+          <CardTitle className="text-base sm:text-lg">Mis Cuentas</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {accounts.map((account) => (
               <div key={account.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium">{account.name}</h3>
-                  <span className={`px-2 py-1 text-xs rounded-full ${
+                  <h3 className="font-medium text-sm truncate flex-1">{account.name}</h3>
+                  <span className={`px-2 py-1 text-xs rounded-full ml-2 flex-shrink-0 ${
                     account.type === 'debit' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
                   }`}>
                     {account.type === 'debit' ? 'Débito' : 'Crédito'}
@@ -298,22 +310,22 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Saldo:</span>
-                    <span className="font-medium">
+                    <span className="text-gray-600 text-sm">Saldo:</span>
+                    <span className="font-medium text-sm">
                       ${account.balance.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   {account.type === 'credit' && (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Límite:</span>
-                        <span className="font-medium">
+                        <span className="text-gray-600 text-sm">Límite:</span>
+                        <span className="font-medium text-sm">
                           ${(account.creditLimit || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Disponible:</span>
-                        <span className="font-medium text-green-600">
+                        <span className="text-gray-600 text-sm">Disponible:</span>
+                        <span className="font-medium text-green-600 text-sm">
                           ${((account.creditLimit || 0) - account.balance).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
