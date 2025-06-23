@@ -1,9 +1,79 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, DollarSign, PieChart, Calendar } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { TrendingUp, DollarSign, PieChart, Calendar, Filter } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import ReportFilters from './ReportFilters';
+import { useReportFilters } from '@/hooks/useReportFilters';
+import { Account } from '@/types';
 
 const ReportsPage: React.FC = () => {
+  const { currentUser } = useAuth();
+  const { filters, updateFilters } = useReportFilters();
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedReportType, setSelectedReportType] = useState<string | null>(null);
+
+  // Cargar cuentas del usuario
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      if (!currentUser) return;
+      
+      try {
+        const accountsRef = collection(db, 'users', currentUser.uid, 'accounts');
+        const snapshot = await getDocs(accountsRef);
+        const accountsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Account[];
+        setAccounts(accountsData);
+      } catch (error) {
+        console.error('Error fetching accounts:', error);
+      }
+    };
+
+    fetchAccounts();
+  }, [currentUser]);
+
+  const reportTypes = [
+    {
+      id: 'financial-summary',
+      title: 'Resumen Financiero',
+      description: 'Saldo total de cuentas y disponible de crédito',
+      icon: DollarSign,
+      color: 'text-green-600'
+    },
+    {
+      id: 'income-expenses',
+      title: 'Ingresos y Gastos',
+      description: 'Análisis por períodos de tiempo',
+      icon: TrendingUp,
+      color: 'text-blue-600'
+    },
+    {
+      id: 'categories',
+      title: 'Por Categorías',
+      description: 'Desglose de gastos por categoría',
+      icon: PieChart,
+      color: 'text-purple-600'
+    },
+    {
+      id: 'trends',
+      title: 'Tendencias',
+      description: 'Gráficos de evolución temporal',
+      icon: Calendar,
+      color: 'text-orange-600'
+    }
+  ];
+
+  const handleReportTypeSelect = (reportId: string) => {
+    setSelectedReportType(reportId);
+    setShowFilters(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -11,81 +81,97 @@ const ReportsPage: React.FC = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Reportes</h1>
           <p className="text-gray-600 mt-1">Analiza tus finanzas con reportes detallados</p>
         </div>
+        <Button
+          variant="outline"
+          onClick={() => setShowFilters(!showFilters)}
+          className="sm:w-auto"
+        >
+          <Filter className="h-4 w-4 mr-2" />
+          {showFilters ? 'Ocultar Filtros' : 'Mostrar Filtros'}
+        </Button>
       </div>
+
+      {/* Filtros */}
+      {showFilters && (
+        <ReportFilters
+          filters={filters}
+          onFiltersChange={updateFilters}
+          accounts={accounts}
+        />
+      )}
 
       {/* Sección de tipos de reportes disponibles */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardHeader className="pb-3">
-            <div className="flex items-center space-x-2">
-              <DollarSign className="h-5 w-5 text-green-600" />
-              <CardTitle className="text-sm font-medium">Resumen Financiero</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <CardDescription className="text-xs">
-              Saldo total de cuentas y disponible de crédito
-            </CardDescription>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardHeader className="pb-3">
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="h-5 w-5 text-blue-600" />
-              <CardTitle className="text-sm font-medium">Ingresos y Gastos</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <CardDescription className="text-xs">
-              Análisis por períodos de tiempo
-            </CardDescription>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardHeader className="pb-3">
-            <div className="flex items-center space-x-2">
-              <PieChart className="h-5 w-5 text-purple-600" />
-              <CardTitle className="text-sm font-medium">Por Categorías</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <CardDescription className="text-xs">
-              Desglose de gastos por categoría
-            </CardDescription>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardHeader className="pb-3">
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-5 w-5 text-orange-600" />
-              <CardTitle className="text-sm font-medium">Tendencias</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <CardDescription className="text-xs">
-              Gráficos de evolución temporal
-            </CardDescription>
-          </CardContent>
-        </Card>
+        {reportTypes.map((report) => {
+          const Icon = report.icon;
+          return (
+            <Card 
+              key={report.id}
+              className={`cursor-pointer hover:shadow-md transition-shadow ${
+                selectedReportType === report.id ? 'ring-2 ring-blue-500' : ''
+              }`}
+              onClick={() => handleReportTypeSelect(report.id)}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-center space-x-2">
+                  <Icon className={`h-5 w-5 ${report.color}`} />
+                  <CardTitle className="text-sm font-medium">{report.title}</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-xs">
+                  {report.description}
+                </CardDescription>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Área principal de contenido */}
       <Card>
         <CardHeader>
-          <CardTitle>Próximamente</CardTitle>
+          <CardTitle>
+            {selectedReportType 
+              ? `Reporte: ${reportTypes.find(r => r.id === selectedReportType)?.title}`
+              : 'Selecciona un tipo de reporte'
+            }
+          </CardTitle>
           <CardDescription>
-            Los reportes detallados estarán disponibles en las próximas actualizaciones
+            {selectedReportType 
+              ? 'Los datos del reporte se mostrarán aquí basados en los filtros aplicados'
+              : 'Elige un tipo de reporte de las opciones anteriores para comenzar'
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="text-center py-12">
             <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">
-              Estamos trabajando en traerte análisis detallados de tus finanzas
+              {selectedReportType 
+                ? 'Próximo paso: implementar la lógica de generación de reportes'
+                : 'Selecciona un tipo de reporte para comenzar el análisis'
+              }
             </p>
+            {selectedReportType && (
+              <div className="mt-4 text-sm text-gray-500">
+                <p>Filtros activos:</p>
+                <ul className="mt-2 space-y-1">
+                  {filters.startDate && (
+                    <li>• Desde: {filters.startDate.toLocaleDateString('es-ES')}</li>
+                  )}
+                  {filters.endDate && (
+                    <li>• Hasta: {filters.endDate.toLocaleDateString('es-ES')}</li>
+                  )}
+                  {filters.type && filters.type !== 'all' && (
+                    <li>• Tipo: {filters.type === 'income' ? 'Ingresos' : 'Gastos'}</li>
+                  )}
+                  {filters.accountId && (
+                    <li>• Cuenta: {accounts.find(a => a.id === filters.accountId)?.name}</li>
+                  )}
+                </ul>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
