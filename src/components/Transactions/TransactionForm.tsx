@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, query, onSnapshot, orderBy, where } from 'firebase/firestore';
@@ -73,7 +74,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
       description: '',
       category: '',
       accountId: '',
-      recurringExpenseId: '',
+      recurringExpenseId: 'none',
     },
   });
 
@@ -113,7 +114,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
 
   // Auto-fill form when recurring expense is selected
   useEffect(() => {
-    if (watchRecurringExpenseId && recurringExpenses.length > 0) {
+    if (watchRecurringExpenseId && watchRecurringExpenseId !== 'none' && recurringExpenses.length > 0) {
       const selectedExpense = recurringExpenses.find(exp => exp.id === watchRecurringExpenseId);
       if (selectedExpense) {
         form.setValue('type', 'expense');
@@ -133,7 +134,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         description: transaction.description,
         category: transaction.category,
         accountId: transaction.accountId,
-        recurringExpenseId: '',
+        recurringExpenseId: 'none',
       });
     } else {
       form.reset({
@@ -143,7 +144,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         description: '',
         category: '',
         accountId: '',
-        recurringExpenseId: '',
+        recurringExpenseId: 'none',
       });
     }
   }, [transaction, form]);
@@ -293,7 +294,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         await updateAccountBalance(data.accountId, amount, data.type);
         
         // Si se seleccionó un pago recurrente, actualizar su próxima fecha de pago
-        if (data.recurringExpenseId) {
+        if (data.recurringExpenseId && data.recurringExpenseId !== 'none') {
           await updateRecurringExpenseNextPayment(data.recurringExpenseId);
           toast({
             title: 'Pago adelantado registrado',
@@ -352,7 +353,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Ninguno - transacción nueva</SelectItem>
+                        <SelectItem value="none">Ninguno - transacción nueva</SelectItem>
                         {recurringExpenses.map((expense) => (
                           <SelectItem key={expense.id} value={expense.id}>
                             <div className="flex flex-col gap-1">
