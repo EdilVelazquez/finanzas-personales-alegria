@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import ReportFilters from './ReportFilters';
+import FinancialSummaryReport from './FinancialSummaryReport';
 import { useReportFilters } from '@/hooks/useReportFilters';
 import { Account } from '@/types';
 
@@ -74,6 +75,33 @@ const ReportsPage: React.FC = () => {
     setShowFilters(true);
   };
 
+  const renderReportContent = () => {
+    if (!selectedReportType) {
+      return (
+        <div className="text-center py-12">
+          <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">
+            Selecciona un tipo de reporte para comenzar el análisis
+          </p>
+        </div>
+      );
+    }
+
+    switch (selectedReportType) {
+      case 'financial-summary':
+        return <FinancialSummaryReport accounts={accounts} filters={filters} />;
+      default:
+        return (
+          <div className="text-center py-12">
+            <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">
+              Este tipo de reporte estará disponible próximamente
+            </p>
+          </div>
+        );
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -139,40 +167,13 @@ const ReportsPage: React.FC = () => {
           </CardTitle>
           <CardDescription>
             {selectedReportType 
-              ? 'Los datos del reporte se mostrarán aquí basados en los filtros aplicados'
+              ? 'Datos basados en los filtros aplicados'
               : 'Elige un tipo de reporte de las opciones anteriores para comenzar'
             }
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-12">
-            <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">
-              {selectedReportType 
-                ? 'Próximo paso: implementar la lógica de generación de reportes'
-                : 'Selecciona un tipo de reporte para comenzar el análisis'
-              }
-            </p>
-            {selectedReportType && (
-              <div className="mt-4 text-sm text-gray-500">
-                <p>Filtros activos:</p>
-                <ul className="mt-2 space-y-1">
-                  {filters.startDate && (
-                    <li>• Desde: {filters.startDate.toLocaleDateString('es-ES')}</li>
-                  )}
-                  {filters.endDate && (
-                    <li>• Hasta: {filters.endDate.toLocaleDateString('es-ES')}</li>
-                  )}
-                  {filters.type && filters.type !== 'all' && (
-                    <li>• Tipo: {filters.type === 'income' ? 'Ingresos' : 'Gastos'}</li>
-                  )}
-                  {filters.accountId && (
-                    <li>• Cuenta: {accounts.find(a => a.id === filters.accountId)?.name}</li>
-                  )}
-                </ul>
-              </div>
-            )}
-          </div>
+          {renderReportContent()}
         </CardContent>
       </Card>
     </div>
