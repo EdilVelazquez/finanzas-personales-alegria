@@ -242,6 +242,7 @@ const Dashboard: React.FC = () => {
         recurringIncomes={recurringIncomes}
         recurringExpenses={recurringExpenses}
         installmentPlans={installmentPlans}
+        accounts={accounts}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
