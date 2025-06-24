@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Account, Transaction, RecurringIncome, RecurringExpense } from '@/types';
+import { Account, Transaction, RecurringIncome, RecurringExpense, InstallmentPlan } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Doughnut, Line } from 'react-chartjs-2';
 import {
@@ -46,6 +46,7 @@ const Dashboard: React.FC = () => {
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [recurringIncomes, setRecurringIncomes] = useState<RecurringIncome[]>([]);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
+  const [installmentPlans, setInstallmentPlans] = useState<InstallmentPlan[]>([]);
   const [showRecurringItems, setShowRecurringItems] = useState(false);
   
   // Estados para los formularios
@@ -124,11 +125,30 @@ const Dashboard: React.FC = () => {
       setRecurringExpenses(expensesData);
     });
 
+    // Escuchar planes de pagos a meses
+    const installmentPlansQuery = query(
+      collection(db, 'users', currentUser.uid, 'installmentPlans'),
+      where('isActive', '==', true),
+      orderBy('nextPaymentDate', 'asc')
+    );
+
+    const unsubscribeInstallmentPlans = onSnapshot(installmentPlansQuery, (snapshot) => {
+      const plansData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        startDate: doc.data().startDate?.toDate(),
+        nextPaymentDate: doc.data().nextPaymentDate?.toDate(),
+        createdAt: doc.data().createdAt?.toDate()
+      })) as InstallmentPlan[];
+      setInstallmentPlans(plansData);
+    });
+
     return () => {
       unsubscribeAccounts();
       unsubscribeTransactions();
       unsubscribeRecurringIncomes();
       unsubscribeRecurringExpenses();
+      unsubscribeInstallmentPlans();
     };
   }, [currentUser]);
 
@@ -221,6 +241,7 @@ const Dashboard: React.FC = () => {
         totalCreditAvailable={totalCreditAvailable}
         recurringIncomes={recurringIncomes}
         recurringExpenses={recurringExpenses}
+        installmentPlans={installmentPlans}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
