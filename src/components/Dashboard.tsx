@@ -21,8 +21,9 @@ import RecurringItemsManager from './Dashboard/RecurringItemsManager';
 import RecurringIncomeForm from './Dashboard/RecurringIncomeForm';
 import RecurringExpenseForm from './Dashboard/RecurringExpenseForm';
 import DeleteRecurringDialog from './Dashboard/DeleteRecurringDialog';
+import TransactionForm from './Transactions/TransactionForm';
 import { Button } from '@/components/ui/button';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Plus } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -48,6 +49,7 @@ const Dashboard: React.FC = () => {
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
   const [installmentPlans, setInstallmentPlans] = useState<InstallmentPlan[]>([]);
   const [showRecurringItems, setShowRecurringItems] = useState(false);
+  const [showQuickTransaction, setShowQuickTransaction] = useState(false);
   
   // Estados para los formularios
   const [showIncomeForm, setShowIncomeForm] = useState(false);
@@ -211,28 +213,38 @@ const Dashboard: React.FC = () => {
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Dashboard</h2>
           <p className="text-sm sm:text-base text-gray-600">Resumen de tus finanzas</p>
         </div>
-        <Sheet open={showRecurringItems} onOpenChange={setShowRecurringItems}>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="w-full sm:w-auto">
-              <TrendingUp className="h-4 w-4 mr-2" />
-              {showRecurringItems ? 'Ocultar Recurrentes' : 'Gestionar Recurrentes'}
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="h-[90vh] overflow-y-auto">
-            <div className="py-4">
-              <RecurringItemsManager
-                recurringIncomes={recurringIncomes}
-                recurringExpenses={recurringExpenses}
-                onAddIncome={handleAddIncome}
-                onAddExpense={handleAddExpense}
-                onEditIncome={handleEditIncome}
-                onEditExpense={handleEditExpense}
-                onDeleteIncome={handleDeleteIncome}
-                onDeleteExpense={handleDeleteExpense}
-              />
-            </div>
-          </SheetContent>
-        </Sheet>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Button 
+            onClick={() => setShowQuickTransaction(true)}
+            className="flex-1 sm:flex-none"
+            size="sm"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Transacción
+          </Button>
+          <Sheet open={showRecurringItems} onOpenChange={setShowRecurringItems}>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="flex-1 sm:flex-none" size="sm">
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Recurrentes
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="h-[90vh] overflow-y-auto">
+              <div className="py-4">
+                <RecurringItemsManager
+                  recurringIncomes={recurringIncomes}
+                  recurringExpenses={recurringExpenses}
+                  onAddIncome={handleAddIncome}
+                  onAddExpense={handleAddExpense}
+                  onEditIncome={handleEditIncome}
+                  onEditExpense={handleEditExpense}
+                  onDeleteIncome={handleDeleteIncome}
+                  onDeleteExpense={handleDeleteExpense}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
 
       {/* Calculadora de presupuesto responsiva */}
@@ -367,6 +379,12 @@ const Dashboard: React.FC = () => {
       </Card>
 
       {/* Diálogos */}
+      <TransactionForm
+        open={showQuickTransaction}
+        onClose={() => setShowQuickTransaction(false)}
+        accounts={accounts}
+      />
+
       <RecurringIncomeForm
         open={showIncomeForm}
         onClose={() => {
