@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, query, onSnapshot, orderBy, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Account, Transaction, RecurringExpense } from '@/types';
+import { Account, Transaction, RecurringExpense, InstallmentPlan } from '@/types';
 import { defaultCategories } from '@/data/categories';
 import {
   Dialog,
@@ -39,7 +39,7 @@ import { useForm } from 'react-hook-form';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar as CalendarIcon, Clock } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrencyWithSymbol } from '@/lib/formatCurrency';
 
@@ -58,6 +58,8 @@ interface FormData {
   category: string;
   accountId: string;
   recurringExpenseId?: string;
+  installmentMonths?: number;
+  useInstallments?: boolean;
 }
 
 const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transaction, accounts }) => {
@@ -75,12 +77,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
       category: '',
       accountId: '',
       recurringExpenseId: 'none',
+      installmentMonths: 1,
+      useInstallments: false,
     },
   });
 
   const watchType = form.watch('type');
   const watchAccountId = form.watch('accountId');
   const watchRecurringExpenseId = form.watch('recurringExpenseId');
+  const watchUseInstallments = form.watch('useInstallments');
 
   // Load recurring expenses
   useEffect(() => {
@@ -135,6 +140,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         category: transaction.category,
         accountId: transaction.accountId,
         recurringExpenseId: 'none',
+        installmentMonths: 1,
+        useInstallments: false,
       });
     } else {
       form.reset({
@@ -145,6 +152,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         category: '',
         accountId: '',
         recurringExpenseId: 'none',
+        installmentMonths: 1,
+        useInstallments: false,
       });
     }
   }, [transaction, form]);
@@ -200,6 +209,27 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
     });
   };
 
+  const createInstallmentPlan = async (accountId: string, amount: number, description: string, installmentMonths: number) => {
+    const monthlyAmount = amount / installmentMonths;
+    const startDate = new Date();
+    const nextPaymentDate = new Date();
+    nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+
+    await addDoc(collection(db, 'users', currentUser!.uid, 'installmentPlans'), {
+      accountId: accountId,
+      description: description,
+      totalAmount: amount,
+      installments: installmentMonths,
+      monthlyAmount: monthlyAmount,
+      remainingInstallments: installmentMonths,
+      startDate: Timestamp.fromDate(startDate),
+      nextPaymentDate: Timestamp.fromDate(nextPaymentDate),
+      userId: currentUser!.uid,
+      createdAt: serverTimestamp(),
+      isActive: true
+    });
+  };
+
   const updateRecurringExpenseNextPayment = async (recurringExpenseId: string) => {
     const expense = recurringExpenses.find(exp => exp.id === recurringExpenseId);
     if (!expense) return;
@@ -238,6 +268,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
       return accounts;
     }
   };
+
+  const selectedAccount = accounts.find(acc => acc.id === watchAccountId);
+  const isCreditAccount = selectedAccount?.type === 'credit';
+  const showInstallmentOption = watchType === 'expense' && isCreditAccount && !transaction;
 
   const onSubmit = async (data: FormData) => {
     if (!currentUser) return;
@@ -293,8 +327,21 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         // Actualizar el saldo de la cuenta
         await updateAccountBalance(data.accountId, amount, data.type);
         
-        // Si se seleccionó un pago recurrente, actualizar su próxima fecha de pago
-        if (data.recurringExpenseId && data.recurringExpenseId !== 'none') {
+        // Si se seleccionó meses sin intereses, crear el plan de pagos
+        if (data.useInstallments && data.installmentMonths && data.installmentMonths > 1) {
+          await createInstallmentPlan(
+            data.accountId, 
+            amount, 
+            `${data.description} (${data.installmentMonths} MSI)`, 
+            data.installmentMonths
+          );
+          
+          toast({
+            title: 'Compra a meses creada',
+            description: `Se creó un plan de ${data.installmentMonths} pagos de ${formatCurrencyWithSymbol(amount / data.installmentMonths)} cada uno.`,
+          });
+        } else if (data.recurringExpenseId && data.recurringExpenseId !== 'none') {
+          // Si se seleccionó un pago recurrente, actualizar su próxima fecha de pago
           await updateRecurringExpenseNextPayment(data.recurringExpenseId);
           toast({
             title: 'Pago adelantado registrado',
@@ -321,12 +368,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
     }
   };
 
-  const selectedAccount = accounts.find(acc => acc.id === watchAccountId);
   const selectedRecurringExpense = recurringExpenses.find(exp => exp.id === watchRecurringExpenseId);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {transaction ? 'Editar Transacción' : 'Nueva Transacción'}
@@ -559,6 +605,74 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
                 </FormItem>
               )}
             />
+
+            {/* Opción de meses sin intereses para tarjetas de crédito */}
+            {showInstallmentOption && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="useInstallments"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel className="flex items-center gap-2">
+                          <CreditCard className="h-4 w-4" />
+                          Meses sin intereses
+                        </FormLabel>
+                        <div className="text-sm text-muted-foreground">
+                          Dividir el pago en mensualidades
+                        </div>
+                      </div>
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          checked={field.value}
+                          onChange={field.onChange}
+                          disabled={loading}
+                          className="h-4 w-4"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {watchUseInstallments && (
+                  <FormField
+                    control={form.control}
+                    name="installmentMonths"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Número de meses</FormLabel>
+                        <Select 
+                          onValueChange={(value) => field.onChange(parseInt(value))} 
+                          value={field.value?.toString()} 
+                          disabled={loading}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecciona los meses" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {[3, 6, 9, 12, 18, 24].map((months) => (
+                              <SelectItem key={months} value={months.toString()}>
+                                {months} meses
+                                {parseFloat(form.watch('amount')) > 0 && (
+                                  <span className="text-sm text-gray-500 ml-2">
+                                    ({formatCurrencyWithSymbol(parseFloat(form.watch('amount')) / months)} mensual)
+                                  </span>
+                                )}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </>
+            )}
 
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={onClose} disabled={loading}>

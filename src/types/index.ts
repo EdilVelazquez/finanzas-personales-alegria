@@ -22,6 +22,7 @@ export interface Transaction {
   userId: string;
   date: Date;
   createdAt: Date;
+  isVirtual?: boolean; // Para identificar transacciones virtuales (saldos iniciales)
 }
 
 export interface Transfer {

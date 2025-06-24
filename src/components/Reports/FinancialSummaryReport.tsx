@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, CreditCard, TrendingUp, TrendingDown } from 'lucide-react';
-import { Account, Transaction } from '@/types';
+import { Account } from '@/types';
 import { formatCurrencyWithSymbol } from '@/lib/formatCurrency';
 import { useTransactions } from '@/hooks/useTransactions';
 import { ReportFilters } from '@/hooks/useReportFilters';
@@ -16,7 +16,7 @@ const FinancialSummaryReport: React.FC<FinancialSummaryReportProps> = ({
   accounts,
   filters
 }) => {
-  const { transactions, loading } = useTransactions(filters);
+  const { transactions, loading } = useTransactions(filters, accounts);
 
   // Calcular totales de cuentas
   const debitAccounts = accounts.filter(acc => acc.type === 'debit');
@@ -28,11 +28,21 @@ const FinancialSummaryReport: React.FC<FinancialSummaryReportProps> = ({
   const totalCreditAvailable = totalCreditLimit - totalCreditUsed;
 
   // Calcular totales de transacciones (según filtros)
-  const totalIncome = transactions
+  // Separar transacciones reales de los saldos iniciales virtuales
+  const realTransactions = transactions.filter(t => !(t as any).isVirtual);
+  const virtualTransactions = transactions.filter(t => (t as any).isVirtual);
+
+  const totalRealIncome = realTransactions
     .filter(t => t.type === 'income')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const totalExpenses = transactions
+  const totalVirtualIncome = virtualTransactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalIncome = totalRealIncome + totalVirtualIncome;
+
+  const totalExpenses = realTransactions
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0);
 
@@ -123,7 +133,10 @@ const FinancialSummaryReport: React.FC<FinancialSummaryReportProps> = ({
           <div className="flex items-center justify-between">
             <div className="space-y-2">
               <p className="text-sm text-gray-600">
-                Ingresos: {formatCurrencyWithSymbol(totalIncome)}
+                Saldos iniciales: {formatCurrencyWithSymbol(totalVirtualIncome)}
+              </p>
+              <p className="text-sm text-gray-600">
+                Ingresos reales: {formatCurrencyWithSymbol(totalRealIncome)}
               </p>
               <p className="text-sm text-gray-600">
                 Gastos: {formatCurrencyWithSymbol(totalExpenses)}

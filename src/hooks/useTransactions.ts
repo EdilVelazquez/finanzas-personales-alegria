@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
-import { Transaction } from '@/types';
+import { Transaction, Account } from '@/types';
 import { ReportFilters } from './useReportFilters';
 
-export const useTransactions = (filters: ReportFilters) => {
+export const useTransactions = (filters: ReportFilters, accounts?: Account[]) => {
   const { currentUser } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -51,6 +51,35 @@ export const useTransactions = (filters: ReportFilters) => {
           transactionsData = transactionsData.filter(t => t.date <= filters.endDate!);
         }
 
+        // Agregar saldos iniciales de cuentas de débito como "ingresos" virtuales
+        // Solo para el cálculo de reportes, no son transacciones reales
+        if (accounts && accounts.length > 0) {
+          const debitAccounts = accounts.filter(acc => acc.type === 'debit' && acc.balance > 0);
+          
+          // Si hay filtro de cuenta específica, solo incluir esa cuenta
+          const accountsToInclude = filters.accountId 
+            ? debitAccounts.filter(acc => acc.id === filters.accountId)
+            : debitAccounts;
+
+          const virtualIncomes = accountsToInclude.map(account => ({
+            id: `virtual-${account.id}`,
+            type: 'income' as const,
+            amount: account.balance,
+            description: `Saldo inicial - ${account.name}`,
+            category: 'Saldo inicial',
+            accountId: account.id,
+            userId: currentUser.uid,
+            date: account.createdAt || new Date(2024, 0, 1), // Fecha anterior a las transacciones
+            createdAt: account.createdAt || new Date(2024, 0, 1),
+            isVirtual: true // Marcador para identificar transacciones virtuales
+          }));
+
+          // Solo agregar ingresos virtuales si no hay filtro de tipo 'expense'
+          if (filters.type !== 'expense') {
+            transactionsData = [...virtualIncomes, ...transactionsData];
+          }
+        }
+
         setTransactions(transactionsData);
       } catch (err) {
         console.error('Error fetching transactions:', err);
@@ -61,7 +90,7 @@ export const useTransactions = (filters: ReportFilters) => {
     };
 
     fetchTransactions();
-  }, [currentUser, filters]);
+  }, [currentUser, filters, accounts]);
 
   return { transactions, loading, error };
 };
