@@ -7,6 +7,9 @@ export interface Account {
   creditLimit?: number;
   userId: string;
   createdAt: Date;
+  // Nuevos campos para tarjetas de crédito
+  cutoffDate?: number; // Día del mes (1-31)
+  paymentDueDate?: number; // Día del mes (1-31)
 }
 
 export interface Transaction {
@@ -59,4 +62,23 @@ export interface RecurringExpense {
   nextPaymentDate: Date;
   userId: string;
   createdAt: Date;
+  // Nuevos campos para pagos automáticos de tarjetas
+  isAutomaticCreditPayment?: boolean;
+  linkedAccountId?: string; // ID de la tarjeta de crédito asociada
+}
+
+// Nueva interfaz para pagos a meses sin intereses
+export interface InstallmentPlan {
+  id: string;
+  accountId: string; // Tarjeta de crédito
+  description: string;
+  totalAmount: number;
+  installments: number; // Número total de meses
+  monthlyAmount: number; // Pago mensual
+  remainingInstallments: number;
+  startDate: Date;
+  nextPaymentDate: Date;
+  userId: string;
+  createdAt: Date;
+  isActive: boolean;
 }

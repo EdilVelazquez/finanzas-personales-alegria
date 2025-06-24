@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
@@ -5,10 +6,11 @@ import { db } from '@/lib/firebase';
 import { Account } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, CreditCard, Wallet, Edit, Trash2 } from 'lucide-react';
+import { Plus, CreditCard, Wallet, Edit, Trash2, Calendar } from 'lucide-react';
 import AccountForm from './AccountForm';
 import DeleteAccountDialog from './DeleteAccountDialog';
 import TransferDialog from './TransferDialog';
+import InstallmentPlanForm from './InstallmentPlanForm';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrencyWithSymbol } from '@/lib/formatCurrency';
 
@@ -20,6 +22,7 @@ const AccountsPage: React.FC = () => {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<Account | null>(null);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [installmentFormOpen, setInstallmentFormOpen] = useState(false);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -80,6 +83,8 @@ const AccountsPage: React.FC = () => {
     }
   };
 
+  const creditAccounts = accounts.filter(account => account.type === 'credit');
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -88,6 +93,14 @@ const AccountsPage: React.FC = () => {
           <p className="text-gray-600">Gestiona tus cuentas de débito y crédito</p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            onClick={() => setInstallmentFormOpen(true)} 
+            variant="outline"
+            disabled={creditAccounts.length === 0}
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            Pagos a Meses
+          </Button>
           <Button onClick={() => setTransferDialogOpen(true)} variant="outline">
             <CreditCard className="h-4 w-4 mr-2" />
             Transferir
@@ -208,6 +221,17 @@ const AccountsPage: React.FC = () => {
                       {formatCurrencyWithSymbol(getAvailableBalance(account))}
                     </span>
                   </div>
+                  
+                  {/* Información de fechas para tarjetas de crédito */}
+                  {account.cutoffDate && account.paymentDueDate && (
+                    <div className="mt-3 pt-2 border-t border-gray-200">
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>Corte: día {account.cutoffDate}</span>
+                        <span>Pago: día {account.paymentDueDate}</span>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                     <div 
                       className="bg-red-600 h-2 rounded-full" 
@@ -253,6 +277,12 @@ const AccountsPage: React.FC = () => {
         open={transferDialogOpen}
         onClose={() => setTransferDialogOpen(false)}
         accounts={accounts}
+      />
+
+      <InstallmentPlanForm
+        open={installmentFormOpen}
+        onClose={() => setInstallmentFormOpen(false)}
+        creditAccounts={creditAccounts}
       />
     </div>
   );

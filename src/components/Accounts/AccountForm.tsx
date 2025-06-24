@@ -42,6 +42,8 @@ interface FormData {
   type: 'debit' | 'credit';
   balance: string;
   creditLimit: string;
+  cutoffDate: string;
+  paymentDueDate: string;
 }
 
 const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accounts }) => {
@@ -55,6 +57,8 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
       type: 'debit',
       balance: '0',
       creditLimit: '0',
+      cutoffDate: '1',
+      paymentDueDate: '20',
     },
   });
 
@@ -67,6 +71,8 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
         type: account.type,
         balance: account.balance.toString(),
         creditLimit: (account.creditLimit || 0).toString(),
+        cutoffDate: (account.cutoffDate || 1).toString(),
+        paymentDueDate: (account.paymentDueDate || 20).toString(),
       });
     } else {
       form.reset({
@@ -74,6 +80,8 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
         type: 'debit',
         balance: '0',
         creditLimit: '0',
+        cutoffDate: '1',
+        paymentDueDate: '20',
       });
     }
   }, [account, form]);
@@ -93,6 +101,13 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
     const num = parseFloat(value);
     if (isNaN(num)) return `${fieldName} debe ser un número válido`;
     if (num < 0) return `${fieldName} no puede ser negativo`;
+    return true;
+  };
+
+  const validateDay = (value: string, fieldName: string) => {
+    const day = parseInt(value);
+    if (isNaN(day)) return `${fieldName} debe ser un número válido`;
+    if (day < 1 || day > 31) return `${fieldName} debe estar entre 1 y 31`;
     return true;
   };
 
@@ -127,6 +142,8 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
           ...baseData,
           balance: parseFloat(data.balance) || 0,
           creditLimit: parseFloat(data.creditLimit),
+          cutoffDate: parseInt(data.cutoffDate),
+          paymentDueDate: parseInt(data.paymentDueDate),
         };
       }
 
@@ -161,6 +178,9 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
       setLoading(false);
     }
   };
+
+  // Generar opciones de días del mes
+  const dayOptions = Array.from({ length: 31 }, (_, i) => i + 1);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -291,6 +311,66 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
                     </FormItem>
                   )}
                 />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="cutoffDate"
+                    rules={{
+                      required: 'La fecha de corte es obligatoria',
+                      validate: (value) => validateDay(value, 'La fecha de corte'),
+                    }}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Fecha de Corte</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={loading}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Día" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {dayOptions.map(day => (
+                              <SelectItem key={day} value={day.toString()}>
+                                {day}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="paymentDueDate"
+                    rules={{
+                      required: 'La fecha límite de pago es obligatoria',
+                      validate: (value) => validateDay(value, 'La fecha límite de pago'),
+                    }}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Fecha Límite de Pago</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={loading}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Día" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {dayOptions.map(day => (
+                              <SelectItem key={day} value={day.toString()}>
+                                {day}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </>
             )}
 

@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, DollarSign, TrendingDown, TrendingUp, AlertTriangle } from 'lucide-react';
-import { RecurringIncome, RecurringExpense } from '@/types';
+import { Calendar, DollarSign, TrendingDown, TrendingUp, AlertTriangle, CreditCard } from 'lucide-react';
+import { RecurringIncome, RecurringExpense, InstallmentPlan } from '@/types';
 import { formatCurrencyWithSymbol } from '@/lib/formatCurrency';
 
 interface BudgetCalculatorProps {
@@ -10,13 +10,15 @@ interface BudgetCalculatorProps {
   totalCreditAvailable: number;
   recurringIncomes: RecurringIncome[];
   recurringExpenses: RecurringExpense[];
+  installmentPlans: InstallmentPlan[];
 }
 
 const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
   totalDebitBalance,
   totalCreditAvailable,
   recurringIncomes,
-  recurringExpenses
+  recurringExpenses,
+  installmentPlans
 }) => {
   const getNextPaymentDate = (items: (RecurringIncome | RecurringExpense)[]) => {
     const dates = items.map(item => item.nextPaymentDate).filter(date => date > new Date());
@@ -37,9 +39,17 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
     const nextIncomeDate = getNextPaymentDate(recurringIncomes);
     if (!nextIncomeDate) return 0;
 
-    return recurringExpenses
+    // Gastos recurrentes
+    const recurringTotal = recurringExpenses
       .filter(expense => expense.nextPaymentDate <= nextIncomeDate)
       .reduce((total, expense) => total + expense.amount, 0);
+
+    // Pagos a meses que vencen antes del próximo ingreso
+    const installmentTotal = installmentPlans
+      .filter(plan => plan.isActive && plan.nextPaymentDate <= nextIncomeDate)
+      .reduce((total, plan) => total + plan.monthlyAmount, 0);
+
+    return recurringTotal + installmentTotal;
   };
 
   const getMonthlyRecurringIncome = () => {
@@ -64,10 +74,17 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
     }, 0);
   };
 
+  const getMonthlyInstallmentPayments = () => {
+    return installmentPlans
+      .filter(plan => plan.isActive)
+      .reduce((total, plan) => total + plan.monthlyAmount, 0);
+  };
+
   const daysUntilPayment = getDaysUntilNextPayment();
   const monthlyIncome = getMonthlyRecurringIncome();
   const monthlyExpenses = getMonthlyRecurringExpenses();
-  const netMonthlyIncome = monthlyIncome - monthlyExpenses;
+  const monthlyInstallments = getMonthlyInstallmentPayments();
+  const netMonthlyIncome = monthlyIncome - monthlyExpenses - monthlyInstallments;
   const upcomingExpenses = getUpcomingExpensesUntilNextIncome();
   
   // Dinero libre = Solo cuentas de débito - pagos próximos programados
@@ -80,7 +97,7 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
   return (
     <div className="space-y-6">
       {/* Resumen de balances separados */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Dinero en Débito</CardTitle>
@@ -102,6 +119,18 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
               {formatCurrencyWithSymbol(upcomingExpenses)}
             </div>
             <p className="text-xs text-gray-500 mt-1">Hasta el próximo ingreso</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Pagos a Meses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {formatCurrencyWithSymbol(monthlyInstallments)}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Mensual total</p>
           </CardContent>
         </Card>
 
@@ -133,6 +162,48 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
           <p className="text-xs text-blue-600 mt-1">Línea de crédito disponible (no incluida en presupuesto diario)</p>
         </CardContent>
       </Card>
+
+      {/* Desglose de pagos a meses activos */}
+      {installmentPlans.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Pagos a Meses Activos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {installmentPlans.map((plan) => (
+                <div key={plan.id} className="p-3 bg-blue-50 rounded-lg">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h4 className="font-medium text-gray-900">{plan.description}</h4>
+                      <p className="text-sm text-gray-600">
+                        {plan.remainingInstallments} de {plan.installments} pagos restantes
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-blue-600">
+                        {formatCurrencyWithSymbol(plan.monthlyAmount)}
+                      </p>
+                      <p className="text-xs text-gray-500">mensual</p>
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full" 
+                      style={{ 
+                        width: `${((plan.installments - plan.remainingInstallments) / plan.installments) * 100}%` 
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Presupuesto diario */}
       <Card>
@@ -200,6 +271,12 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                     <span className="text-sm text-gray-600">Gastos recurrentes:</span>
                     <span className="font-medium text-red-600">
                       -{formatCurrencyWithSymbol(monthlyExpenses)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Pagos a meses:</span>
+                    <span className="font-medium text-blue-600">
+                      -{formatCurrencyWithSymbol(monthlyInstallments)}
                     </span>
                   </div>
                   <hr className="my-2" />
