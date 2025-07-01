@@ -103,12 +103,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         createdAt: doc.data().createdAt?.toDate()
       })) as RecurringExpense[];
       
-      // Only show upcoming expenses (within next 30 days)
-      const now = new Date();
-      const thirtyDaysFromNow = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
-      const upcomingExpenses = expensesData.filter(expense => 
-        expense.nextPaymentDate >= now && expense.nextPaymentDate <= thirtyDaysFromNow
-      );
+      // Show expenses from today and next 30 days
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Start of today
+      const thirtyDaysFromNow = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
+      const upcomingExpenses = expensesData.filter(expense => {
+        const expenseDate = new Date(expense.nextPaymentDate);
+        expenseDate.setHours(0, 0, 0, 0); // Start of expense date
+        return expenseDate >= today && expenseDate <= thirtyDaysFromNow;
+      });
       
       setRecurringExpenses(upcomingExpenses);
     });
@@ -270,7 +273,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
 
   const selectedAccount = accounts.find(acc => acc.id === watchAccountId);
   const isCreditAccount = selectedAccount?.type === 'credit';
-  const showInstallmentOption = watchType === 'expense' && isCreditAccount && !transaction;
+  const showInstallmentOption = watchType === 'expense' && isCreditAccount;
 
   const onSubmit = async (data: FormData) => {
     if (!currentUser) return;
@@ -312,10 +315,25 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         // Aplicar el nuevo efecto
         await updateAccountBalance(data.accountId, amount, data.type);
         
-        toast({
-          title: 'Transacción actualizada',
-          description: 'La transacción se ha actualizado correctamente.',
-        });
+        // Si se convirtió a meses sin intereses, crear el plan de pagos
+        if (data.useInstallments && data.installmentMonths && data.installmentMonths > 1) {
+          await createInstallmentPlan(
+            data.accountId, 
+            amount, 
+            `${data.description} (${data.installmentMonths} MSI)`, 
+            data.installmentMonths
+          );
+          
+          toast({
+            title: 'Transacción convertida a MSI',
+            description: `Se creó un plan de ${data.installmentMonths} pagos de ${formatCurrencyWithSymbol(amount / data.installmentMonths)} cada uno.`,
+          });
+        } else {
+          toast({
+            title: 'Transacción actualizada',
+            description: 'La transacción se ha actualizado correctamente.',
+          });
+        }
       } else {
         // Crear nueva transacción
         await addDoc(collection(db, 'users', currentUser.uid, 'transactions'), {

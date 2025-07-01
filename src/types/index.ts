@@ -23,6 +23,8 @@ export interface Transaction {
   date: Date;
   createdAt: Date;
   isVirtual?: boolean; // Para identificar transacciones virtuales (saldos iniciales)
+  isInstallment?: boolean; // Para transacciones de planes de pago
+  installmentPlanId?: string; // Referencia al plan de pago
 }
 
 export interface Transfer {

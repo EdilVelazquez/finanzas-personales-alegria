@@ -3,9 +3,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, onSnapshot, orderBy, where, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Account, Transaction } from '@/types';
+import { useAllTransactions } from '@/hooks/useAllTransactions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowUpCircle, ArrowDownCircle, Edit, Trash2, Filter } from 'lucide-react';
+import { Plus, ArrowUpCircle, ArrowDownCircle, Edit, Trash2, Filter, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import TransactionForm from './TransactionForm';
 import DeleteTransactionDialog from './DeleteTransactionDialog';
@@ -28,6 +29,7 @@ import {
 const TransactionsPage: React.FC = () => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
+  const { transactions: allTransactions, loading: transactionsLoading } = useAllTransactions();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -36,6 +38,7 @@ const TransactionsPage: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<TTransactionFilters>({});
   const [loading, setLoading] = useState(true);
+  const [groupByMonth, setGroupByMonth] = useState(false);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -54,51 +57,33 @@ const TransactionsPage: React.FC = () => {
       setAccounts(accountsData);
     });
 
-    // Escuchar transacciones
-    let transactionsQuery = query(
-      collection(db, 'users', currentUser.uid, 'transactions'),
-      orderBy('date', 'desc')
-    );
+    return unsubscribeAccounts;
+  }, [currentUser]);
 
-    // Aplicar filtros si existen
+  // Aplicar filtros a las transacciones
+  useEffect(() => {
+    let filteredTransactions = allTransactions;
+    
+    // Aplicar filtros
     if (filters.type) {
-      transactionsQuery = query(transactionsQuery, where('type', '==', filters.type));
+      filteredTransactions = filteredTransactions.filter(t => t.type === filters.type);
     }
     if (filters.category) {
-      transactionsQuery = query(transactionsQuery, where('category', '==', filters.category));
+      filteredTransactions = filteredTransactions.filter(t => t.category === filters.category);
     }
     if (filters.accountId) {
-      transactionsQuery = query(transactionsQuery, where('accountId', '==', filters.accountId));
+      filteredTransactions = filteredTransactions.filter(t => t.accountId === filters.accountId);
     }
-
-    const unsubscribeTransactions = onSnapshot(transactionsQuery, (snapshot) => {
-      const transactionsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data().date?.toDate(),
-        createdAt: doc.data().createdAt?.toDate()
-      })) as Transaction[];
-      
-      // Aplicar filtros de fecha en el cliente
-      let filteredTransactions = transactionsData;
-      if (filters.startDate || filters.endDate) {
-        filteredTransactions = transactionsData.filter(transaction => {
-          const transactionDate = transaction.date;
-          if (filters.startDate && transactionDate < filters.startDate) return false;
-          if (filters.endDate && transactionDate > filters.endDate) return false;
-          return true;
-        });
-      }
-      
-      setTransactions(filteredTransactions);
-      setLoading(false);
-    });
-
-    return () => {
-      unsubscribeAccounts();
-      unsubscribeTransactions();
-    };
-  }, [currentUser, filters]);
+    if (filters.startDate) {
+      filteredTransactions = filteredTransactions.filter(t => t.date >= filters.startDate!);
+    }
+    if (filters.endDate) {
+      filteredTransactions = filteredTransactions.filter(t => t.date <= filters.endDate!);
+    }
+    
+    setTransactions(filteredTransactions);
+    setLoading(transactionsLoading);
+  }, [allTransactions, filters, transactionsLoading]);
 
   // Función para calcular el saldo acumulado por cuenta
   const calculateRunningBalance = () => {
@@ -143,6 +128,28 @@ const TransactionsPage: React.FC = () => {
   };
 
   const transactionsWithBalance = calculateRunningBalance();
+
+  // Función para agrupar transacciones por mes
+  const groupTransactionsByMonth = (transactions: (Transaction & { accountBalance: number })[]) => {
+    if (!groupByMonth) return { ungrouped: transactions };
+    
+    const grouped = transactions.reduce((groups, transaction) => {
+      const monthYear = transaction.date.toLocaleDateString('es-ES', { 
+        year: 'numeric', 
+        month: 'long' 
+      });
+      
+      if (!groups[monthYear]) {
+        groups[monthYear] = [];
+      }
+      groups[monthYear].push(transaction);
+      return groups;
+    }, {} as { [key: string]: (Transaction & { accountBalance: number })[] });
+    
+    return grouped;
+  };
+
+  const groupedTransactions = groupTransactionsByMonth(transactionsWithBalance);
 
   const handleCreateTransaction = () => {
     setEditingTransaction(null);
@@ -205,6 +212,14 @@ const TransactionsPage: React.FC = () => {
           <p className="text-sm sm:text-base text-gray-600">Gestiona tus ingresos y gastos</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button 
+            variant={groupByMonth ? "default" : "outline"} 
+            onClick={() => setGroupByMonth(!groupByMonth)}
+            className="w-full sm:w-auto"
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            {groupByMonth ? 'Vista Lista' : 'Agrupar por Mes'}
+          </Button>
           <Sheet open={showFilters} onOpenChange={setShowFilters}>
             <SheetTrigger asChild>
               <Button variant="outline" className="w-full sm:w-auto">
@@ -273,9 +288,155 @@ const TransactionsPage: React.FC = () => {
         <CardContent className="p-0 sm:p-6">
           {transactionsWithBalance.length > 0 ? (
             <div className="overflow-x-auto">
-              {/* Vista móvil - Cards */}
-              <div className="sm:hidden space-y-3 p-4">
-                {transactionsWithBalance.map((transaction) => (
+              {groupByMonth ? (
+                // Vista agrupada por mes
+                <div className="space-y-6 p-4">
+                  {Object.entries(groupedTransactions).map(([monthYear, monthTransactions]) => {
+                    const transactions = monthTransactions as (Transaction & { accountBalance: number })[];
+                    const monthTotal = transactions.reduce((sum, t) => 
+                      sum + (t.type === 'income' ? t.amount : -t.amount), 0
+                    );
+                    
+                    return (
+                      <div key={monthYear} className="space-y-3">
+                        <div className="flex justify-between items-center p-3 bg-gray-100 rounded-lg">
+                          <h3 className="font-semibold text-lg capitalize">{monthYear}</h3>
+                          <span className={`font-bold ${monthTotal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {monthTotal >= 0 ? '+' : ''}{formatCurrencyWithSymbol(monthTotal)}
+                          </span>
+                        </div>
+                        
+                        {/* Vista móvil para el grupo */}
+                        <div className="sm:hidden space-y-2">
+                          {transactions.map((transaction) => (
+                            <Card key={transaction.id} className="p-3">
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center gap-2">
+                                  {transaction.type === 'income' ? (
+                                    <ArrowUpCircle className="h-4 w-4 text-green-600" />
+                                  ) : (
+                                    <ArrowDownCircle className="h-4 w-4 text-red-600" />
+                                  )}
+                                  <span className={`text-sm font-medium ${
+                                    transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    {transaction.type === 'income' ? 'Ingreso' : 'Gasto'}
+                                  </span>
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditTransaction(transaction)}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteTransaction(transaction)}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                              <div className="space-y-1 text-sm">
+                                <div className="font-medium">{transaction.description}</div>
+                                <div className="text-gray-500">{transaction.category}</div>
+                                <div className="text-gray-500">{getAccountName(transaction.accountId)}</div>
+                                <div className="text-gray-500">
+                                  {transaction.date?.toLocaleDateString('es-ES')}
+                                </div>
+                                <div className="flex justify-between items-center pt-2 border-t">
+                                  <span className={`font-medium ${
+                                    transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    {transaction.type === 'income' ? '+' : '-'}
+                                    {formatCurrencyWithSymbol(transaction.amount)}
+                                  </span>
+                                </div>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                        
+                        {/* Vista desktop para el grupo */}
+                        <div className="hidden sm:block">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs">Fecha</TableHead>
+                                <TableHead className="text-xs">Tipo</TableHead>
+                                <TableHead className="text-xs">Descripción</TableHead>
+                                <TableHead className="text-xs">Categoría</TableHead>
+                                <TableHead className="text-xs">Cuenta</TableHead>
+                                <TableHead className="text-right text-xs">Monto</TableHead>
+                                <TableHead className="text-right text-xs">Acciones</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {transactions.map((transaction) => (
+                                <TableRow key={transaction.id}>
+                                  <TableCell className="text-xs">
+                                    {transaction.date?.toLocaleDateString('es-ES')}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      {transaction.type === 'income' ? (
+                                        <ArrowUpCircle className="h-4 w-4 text-green-600" />
+                                      ) : (
+                                        <ArrowDownCircle className="h-4 w-4 text-red-600" />
+                                      )}
+                                      <span className={`text-xs ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                                        {transaction.type === 'income' ? 'Ingreso' : 'Gasto'}
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-xs max-w-32 truncate">{transaction.description}</TableCell>
+                                  <TableCell className="text-xs">{transaction.category}</TableCell>
+                                  <TableCell className="text-xs max-w-24 truncate">{getAccountName(transaction.accountId)}</TableCell>
+                                  <TableCell className={`text-right font-medium text-xs ${
+                                    transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    {transaction.type === 'income' ? '+' : '-'}
+                                    {formatCurrencyWithSymbol(transaction.amount)}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex justify-end gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleEditTransaction(transaction)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Edit className="h-3 w-3" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteTransaction(transaction)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <>
+                  {/* Vista móvil - Cards */}
+                  <div className="sm:hidden space-y-3 p-4">
+                    {transactionsWithBalance.map((transaction) => (
                   <Card key={transaction.id} className="p-4">
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2">
@@ -330,12 +491,12 @@ const TransactionsPage: React.FC = () => {
                         </span>
                       </div>
                     </div>
-                  </Card>
-                ))}
-              </div>
+                    </Card>
+                  ))}
+                  </div>
 
-              {/* Vista desktop - Tabla */}
-              <div className="hidden sm:block">
+                  {/* Vista desktop - Tabla */}
+                  <div className="hidden sm:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -404,8 +565,10 @@ const TransactionsPage: React.FC = () => {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
-              </div>
+                    </Table>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="text-center py-12 px-4">
