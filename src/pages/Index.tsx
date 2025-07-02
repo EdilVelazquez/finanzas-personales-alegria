@@ -7,6 +7,7 @@ import Dashboard from '@/components/Dashboard';
 import AccountsPage from '@/components/Accounts/AccountsPage';
 import TransactionsPage from '@/components/Transactions/TransactionsPage';
 import ReportsPage from '@/components/Reports/ReportsPage';
+import CategoriesPage from '@/components/Categories/CategoriesPage';
 import { Toaster } from '@/components/ui/toaster';
 
 const AppContent: React.FC = () => {
@@ -53,6 +54,8 @@ const AppContent: React.FC = () => {
         return <TransactionsPage />;
       case 'reports':
         return <ReportsPage />;
+      case 'categories':
+        return <CategoriesPage />;
       default:
         return <Dashboard />;
     }

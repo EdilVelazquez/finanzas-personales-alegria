@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { LogOut, Menu, Home, CreditCard, ArrowUpDown, BarChart3 } from 'lucide-react';
+import { LogOut, Menu, Home, CreditCard, ArrowUpDown, BarChart3, Tag } from 'lucide-react';
 import { useState } from 'react';
 import {
   Sheet,
@@ -23,7 +23,8 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange }) 
     { id: 'dashboard', name: 'Dashboard', icon: Home },
     { id: 'accounts', name: 'Cuentas', icon: CreditCard },
     { id: 'transactions', name: 'Transacciones', icon: ArrowUpDown },
-    { id: 'reports', name: 'Reportes', icon: BarChart3 }
+    { id: 'reports', name: 'Reportes', icon: BarChart3 },
+    { id: 'categories', name: 'Categorías', icon: Tag }
   ];
 
   const handleMenuItemClick = (itemId: string) => {

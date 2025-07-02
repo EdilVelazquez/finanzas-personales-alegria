@@ -87,7 +87,12 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
   const monthlyIncome = getMonthlyRecurringIncome();
   const monthlyExpenses = getMonthlyRecurringExpenses();
   const monthlyInstallments = getMonthlyInstallmentPayments();
-  const netMonthlyIncome = monthlyIncome - monthlyExpenses - monthlyInstallments;
+  
+  // Calcular dinero apartado para gastos (gastos recurrentes + meses sin intereses)
+  const moneyForExpenses = monthlyExpenses + monthlyInstallments;
+  
+  // Dinero libre después de gastos programados y presupuesto diario
+  const netMonthlyIncome = monthlyIncome - moneyForExpenses;
   const upcomingExpenses = getUpcomingExpensesUntilNextIncome();
   
   const freeMoney = totalDebitBalance - upcomingExpenses;
@@ -495,9 +500,15 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                       -{formatCurrencyWithSymbol(monthlyInstallments)}
                     </span>
                   </div>
+                  <div className="flex justify-between bg-orange-100 p-2 rounded">
+                    <span className="text-sm font-medium text-orange-700">Dinero apartado para gastos:</span>
+                    <span className="font-bold text-orange-700">
+                      -{formatCurrencyWithSymbol(moneyForExpenses)}
+                    </span>
+                  </div>
                   <hr className="my-2" />
                   <div className="flex justify-between">
-                    <span className="font-medium text-gray-700">Neto mensual:</span>
+                    <span className="font-medium text-gray-700">Disponible para extras:</span>
                     <span className={`font-bold ${netMonthlyIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {formatCurrencyWithSymbol(netMonthlyIncome)}
                     </span>

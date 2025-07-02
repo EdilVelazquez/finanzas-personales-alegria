@@ -189,9 +189,19 @@ const TransactionsPage: React.FC = () => {
   };
 
   const getTotalIncome = () => {
-    return allTransactions
+    // Incluir saldo inicial de cuentas como ingresos
+    const initialBalance = accounts.reduce((sum, account) => {
+      if (account.type === 'debit') {
+        return sum + account.balance;
+      }
+      return sum;
+    }, 0);
+    
+    const transactionsIncome = allTransactions
       .filter(t => t.type === 'income')
       .reduce((sum, t) => sum + t.amount, 0);
+    
+    return initialBalance + transactionsIncome;
   };
 
   const getTotalExpenses = () => {
