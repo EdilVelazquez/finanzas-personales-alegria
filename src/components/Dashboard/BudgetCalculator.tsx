@@ -43,15 +43,38 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
     const today = new Date();
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
-    const recurringTotal = recurringExpenses
-      .filter(expense => expense.nextPaymentDate <= endOfMonth)
-      .reduce((total, expense) => total + expense.amount, 0);
+    let recurringTotal = 0;
+    
+    recurringExpenses.forEach(expense => {
+      if (expense.frequency === 'weekly') {
+        // Para pagos semanales, calcular todos los pagos que caen en el mes
+        const weeklyPayments = getWeeklyPaymentsInMonth(expense.nextPaymentDate, endOfMonth);
+        recurringTotal += weeklyPayments.length * expense.amount;
+      } else {
+        // Para pagos mensuales y bisemanales, solo el próximo pago si está en el mes
+        if (expense.nextPaymentDate <= endOfMonth) {
+          recurringTotal += expense.amount;
+        }
+      }
+    });
 
     const installmentTotal = installmentPlans
       .filter(plan => plan.isActive && plan.nextPaymentDate <= endOfMonth)
       .reduce((total, plan) => total + plan.monthlyAmount, 0);
 
     return recurringTotal + installmentTotal;
+  };
+
+  const getWeeklyPaymentsInMonth = (nextPaymentDate: Date, endOfMonth: Date) => {
+    const payments = [];
+    let currentDate = new Date(nextPaymentDate);
+    
+    while (currentDate <= endOfMonth) {
+      payments.push(new Date(currentDate));
+      currentDate.setDate(currentDate.getDate() + 7); // Agregar 7 días
+    }
+    
+    return payments;
   };
 
   const getMonthlyRecurringIncome = () => {
@@ -162,7 +185,24 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                   .filter(expense => {
                     const today = new Date();
                     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                    return expense.nextPaymentDate <= endOfMonth;
+                    return expense.nextPaymentDate <= endOfMonth || expense.frequency === 'weekly';
+                  })
+                  .flatMap(expense => {
+                    const today = new Date();
+                    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    
+                    if (expense.frequency === 'weekly') {
+                      // Para pagos semanales, mostrar todos los pagos del mes
+                      const weeklyPayments = getWeeklyPaymentsInMonth(expense.nextPaymentDate, endOfMonth);
+                      return weeklyPayments.map((paymentDate, index) => ({
+                        ...expense,
+                        id: `${expense.id}-${index}`,
+                        nextPaymentDate: paymentDate
+                      }));
+                    } else {
+                      // Para otros tipos, solo el próximo pago
+                      return [expense];
+                    }
                   })
                   .map(expense => (
                     <div key={expense.id} className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
