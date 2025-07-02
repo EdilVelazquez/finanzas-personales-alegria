@@ -379,77 +379,30 @@ const TransactionsPage: React.FC = () => {
           </Card>
         </div>
 
-        {/* Fechas personalizadas */}
+        {/* Fechas personalizadas sin calendario */}
         {dateFilter === 'custom' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Card className="p-4">
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Desde</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !customStartDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customStartDate ? (
-                        format(customStartDate, "dd/MM/yyyy", { locale: es })
-                      ) : (
-                        "Seleccionar"
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 z-50 bg-background" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={customStartDate}
-                      onSelect={setCustomStartDate}
-                      disabled={(date) => date > new Date()}
-                      initialFocus
-                      className="p-3 pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Label className="text-sm font-medium">Desde (YYYY-MM-DD)</Label>
+                <input
+                  type="date"
+                  value={customStartDate?.toISOString().split('T')[0] || ''}
+                  onChange={(e) => setCustomStartDate(e.target.value ? new Date(e.target.value) : undefined)}
+                  className="w-full p-2 border border-input rounded-md bg-background text-foreground"
+                />
               </div>
             </Card>
 
             <Card className="p-4">
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Hasta</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !customEndDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customEndDate ? (
-                        format(customEndDate, "dd/MM/yyyy", { locale: es })
-                      ) : (
-                        "Seleccionar"
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 z-50 bg-background" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={customEndDate}
-                      onSelect={setCustomEndDate}
-                      disabled={(date) => 
-                        date > new Date() || 
-                        (customStartDate && date < customStartDate)
-                      }
-                      initialFocus
-                      className="p-3 pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Label className="text-sm font-medium">Hasta (YYYY-MM-DD)</Label>
+                <input
+                  type="date"
+                  value={customEndDate?.toISOString().split('T')[0] || ''}
+                  onChange={(e) => setCustomEndDate(e.target.value ? new Date(e.target.value) : undefined)}
+                  className="w-full p-2 border border-input rounded-md bg-background text-foreground"
+                />
               </div>
             </Card>
           </div>

@@ -4,7 +4,8 @@ import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/f
 import { db } from '@/lib/firebase';
 import { Account, Transaction, RecurringIncome, RecurringExpense, InstallmentPlan } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Doughnut, Line } from 'react-chartjs-2';
+import { Doughnut, Line, Bar } from 'react-chartjs-2';
+import { useCategories } from '@/hooks/useCategories';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -14,6 +15,7 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title
 } from 'chart.js';
 import BudgetCalculator from './Dashboard/BudgetCalculator';
@@ -38,13 +40,16 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title
 );
 
 const Dashboard: React.FC = () => {
   const { currentUser } = useAuth();
+  const { categories } = useCategories();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [recurringIncomes, setRecurringIncomes] = useState<RecurringIncome[]>([]);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
   const [installmentPlans, setInstallmentPlans] = useState<InstallmentPlan[]>([]);
@@ -79,13 +84,13 @@ const Dashboard: React.FC = () => {
     });
 
     // Escuchar transacciones recientes
-    const transactionsQuery = query(
+    const recentTransactionsQuery = query(
       collection(db, 'users', currentUser.uid, 'transactions'),
       orderBy('date', 'desc'),
       limit(5)
     );
 
-    const unsubscribeTransactions = onSnapshot(transactionsQuery, (snapshot) => {
+    const unsubscribeRecentTransactions = onSnapshot(recentTransactionsQuery, (snapshot) => {
       const transactionsData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
@@ -93,6 +98,22 @@ const Dashboard: React.FC = () => {
         createdAt: doc.data().createdAt?.toDate()
       })) as Transaction[];
       setRecentTransactions(transactionsData);
+    });
+
+    // Escuchar todas las transacciones para gráficas
+    const allTransactionsQuery = query(
+      collection(db, 'users', currentUser.uid, 'transactions'),
+      orderBy('date', 'desc')
+    );
+
+    const unsubscribeAllTransactions = onSnapshot(allTransactionsQuery, (snapshot) => {
+      const transactionsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        date: doc.data().date?.toDate(),
+        createdAt: doc.data().createdAt?.toDate()
+      })) as Transaction[];
+      setAllTransactions(transactionsData);
     });
 
     // Escuchar ingresos recurrentes
@@ -147,7 +168,8 @@ const Dashboard: React.FC = () => {
 
     return () => {
       unsubscribeAccounts();
-      unsubscribeTransactions();
+      unsubscribeRecentTransactions();
+      unsubscribeAllTransactions();
       unsubscribeRecurringIncomes();
       unsubscribeRecurringExpenses();
       unsubscribeInstallmentPlans();
@@ -175,6 +197,101 @@ const Dashboard: React.FC = () => {
       borderColor: '#ffffff'
     }]
   };
+
+  // Datos para gráfica de gastos por categoría (mes actual)
+  const getCurrentMonthExpensesByCategory = () => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    
+    const monthExpenses = allTransactions.filter(t => 
+      t.type === 'expense' && 
+      t.date >= startOfMonth && 
+      t.date <= endOfMonth
+    );
+
+    const categoryTotals: { [key: string]: number } = {};
+    monthExpenses.forEach(expense => {
+      categoryTotals[expense.category] = (categoryTotals[expense.category] || 0) + expense.amount;
+    });
+
+    const sortedCategories = Object.entries(categoryTotals)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10); // Top 10 categorías
+
+    return {
+      labels: sortedCategories.map(([category]) => category),
+      datasets: [{
+        label: 'Gastos por Categoría',
+        data: sortedCategories.map(([,amount]) => amount),
+        backgroundColor: [
+          '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4',
+          '#3b82f6', '#8b5cf6', '#ec4899', '#f43f5e', '#84cc16'
+        ],
+        borderWidth: 0
+      }]
+    };
+  };
+
+  // Datos para gráfica de tendencia mensual
+  const getMonthlyTrend = () => {
+    const last6Months = [];
+    const now = new Date();
+    
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      last6Months.push(date);
+    }
+
+    const monthlyData = last6Months.map(month => {
+      const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
+      const endOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+      
+      const monthTransactions = allTransactions.filter(t => 
+        t.date >= startOfMonth && t.date <= endOfMonth
+      );
+
+      const income = monthTransactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + t.amount, 0);
+      
+      const expenses = monthTransactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      return {
+        month: month.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' }),
+        income,
+        expenses,
+        balance: income - expenses
+      };
+    });
+
+    return {
+      labels: monthlyData.map(d => d.month),
+      datasets: [
+        {
+          label: 'Ingresos',
+          data: monthlyData.map(d => d.income),
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34, 197, 94, 0.1)',
+          fill: false,
+          tension: 0.1
+        },
+        {
+          label: 'Gastos',
+          data: monthlyData.map(d => d.expenses),
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          fill: false,
+          tension: 0.1
+        }
+      ]
+    };
+  };
+
+  const expensesCategoryData = getCurrentMonthExpensesByCategory();
+  const monthlyTrendData = getMonthlyTrend();
 
   // Funciones para manejar ingresos y gastos recurrentes
   const handleAddIncome = () => {
@@ -257,6 +374,7 @@ const Dashboard: React.FC = () => {
         accounts={accounts}
       />
 
+      {/* Gráficas principales */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Gráfico de distribución - Responsivo */}
         <Card>
@@ -285,6 +403,85 @@ const Dashboard: React.FC = () => {
                 />
               ) : (
                 <p className="text-gray-500 text-sm">No hay datos para mostrar</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Gastos por categoría - Mes actual */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base sm:text-lg">
+              Gastos por Categoría ({new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-48 sm:h-64 flex items-center justify-center">
+              {expensesCategoryData.labels.length > 0 ? (
+                <Bar 
+                  data={expensesCategoryData} 
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        display: false
+                      }
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        ticks: {
+                          callback: function(value) {
+                            return '$' + Number(value).toLocaleString('es-ES');
+                          }
+                        }
+                      }
+                    }
+                  }}
+                />
+              ) : (
+                <p className="text-gray-500 text-sm">No hay gastos este mes</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Gráficas adicionales */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        {/* Tendencia mensual */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base sm:text-lg">Tendencia de Ingresos vs Gastos (6 meses)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-48 sm:h-64 flex items-center justify-center">
+              {monthlyTrendData.labels.length > 0 ? (
+                <Line 
+                  data={monthlyTrendData} 
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        ticks: {
+                          callback: function(value) {
+                            return '$' + Number(value).toLocaleString('es-ES');
+                          }
+                        }
+                      }
+                    },
+                    plugins: {
+                      legend: {
+                        position: 'bottom'
+                      }
+                    }
+                  }}
+                />
+              ) : (
+                <p className="text-gray-500 text-sm">No hay datos suficientes</p>
               )}
             </div>
           </CardContent>
