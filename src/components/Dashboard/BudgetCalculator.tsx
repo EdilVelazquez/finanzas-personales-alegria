@@ -204,19 +204,30 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                       return [expense];
                     }
                   })
-                  .map(expense => (
-                    <div key={expense.id} className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                      <div>
-                        <span className="font-medium block">{expense.name}</span>
-                        <span className="text-sm text-gray-600">
-                          {expense.nextPaymentDate.toLocaleDateString('es-ES')}
+                  .sort((a, b) => a.nextPaymentDate.getTime() - b.nextPaymentDate.getTime())
+                  .map((expense, index) => {
+                    const today = new Date();
+                    const isOverdue = expense.nextPaymentDate < today;
+                    const bgColors = ['bg-red-50', 'bg-orange-50', 'bg-pink-50', 'bg-rose-50'];
+                    const textColors = ['text-red-600', 'text-orange-600', 'text-pink-600', 'text-rose-600'];
+                    const bgColor = bgColors[index % bgColors.length];
+                    const textColor = textColors[index % textColors.length];
+                    
+                    return (
+                      <div key={expense.id} className={`flex justify-between items-center p-3 ${bgColor} rounded-lg ${isOverdue ? 'border-l-4 border-red-500' : ''}`}>
+                        <div>
+                          <span className="font-medium block">{expense.name}</span>
+                          <span className="text-sm text-gray-600">
+                            {expense.nextPaymentDate.toLocaleDateString('es-ES')}
+                            {isOverdue && <span className="ml-2 text-red-500 font-medium">(Vencido)</span>}
+                          </span>
+                        </div>
+                        <span className={`font-bold ${textColor}`}>
+                          {formatCurrencyWithSymbol(expense.amount)}
                         </span>
                       </div>
-                      <span className="font-bold text-red-600">
-                        {formatCurrencyWithSymbol(expense.amount)}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 
                 {installmentPlans
                   .filter(plan => {
@@ -224,19 +235,30 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
                     return plan.isActive && plan.nextPaymentDate <= endOfMonth;
                   })
-                  .map(plan => (
-                    <div key={plan.id} className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                      <div>
-                        <span className="font-medium block">{plan.description}</span>
-                        <span className="text-sm text-gray-600">
-                          {plan.nextPaymentDate.toLocaleDateString('es-ES')}
+                  .sort((a, b) => a.nextPaymentDate.getTime() - b.nextPaymentDate.getTime())
+                  .map((plan, index) => {
+                    const today = new Date();
+                    const isOverdue = plan.nextPaymentDate < today;
+                    const bgColors = ['bg-blue-50', 'bg-indigo-50', 'bg-purple-50', 'bg-cyan-50'];
+                    const textColors = ['text-blue-600', 'text-indigo-600', 'text-purple-600', 'text-cyan-600'];
+                    const bgColor = bgColors[index % bgColors.length];
+                    const textColor = textColors[index % textColors.length];
+                    
+                    return (
+                      <div key={plan.id} className={`flex justify-between items-center p-3 ${bgColor} rounded-lg ${isOverdue ? 'border-l-4 border-red-500' : ''}`}>
+                        <div>
+                          <span className="font-medium block">{plan.description}</span>
+                          <span className="text-sm text-gray-600">
+                            {plan.nextPaymentDate.toLocaleDateString('es-ES')}
+                            {isOverdue && <span className="ml-2 text-red-500 font-medium">(Vencido)</span>}
+                          </span>
+                        </div>
+                        <span className={`font-bold ${textColor}`}>
+                          {formatCurrencyWithSymbol(plan.monthlyAmount)}
                         </span>
                       </div>
-                      <span className="font-bold text-blue-600">
-                        {formatCurrencyWithSymbol(plan.monthlyAmount)}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                 <div className="border-t pt-3 mt-3">
                   <div className="flex justify-between items-center">

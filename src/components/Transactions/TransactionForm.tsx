@@ -103,17 +103,18 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         createdAt: doc.data().createdAt?.toDate()
       })) as RecurringExpense[];
       
-      // Show expenses from today and next 30 days
+      // Show expenses from 30 days ago (vencidos) hasta 30 días en el futuro
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Start of today
+      const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
       const thirtyDaysFromNow = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
-      const upcomingExpenses = expensesData.filter(expense => {
+      const availableExpenses = expensesData.filter(expense => {
         const expenseDate = new Date(expense.nextPaymentDate);
         expenseDate.setHours(0, 0, 0, 0); // Start of expense date
-        return expenseDate >= today && expenseDate <= thirtyDaysFromNow;
+        return expenseDate >= thirtyDaysAgo && expenseDate <= thirtyDaysFromNow;
       });
       
-      setRecurringExpenses(upcomingExpenses);
+      setRecurringExpenses(availableExpenses);
     });
 
     return unsubscribe;
@@ -417,21 +418,27 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="none">Ninguno - transacción nueva</SelectItem>
-                        {recurringExpenses.map((expense) => (
-                          <SelectItem key={expense.id} value={expense.id}>
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center justify-between w-full">
-                                <span className="font-medium">{expense.name}</span>
-                                <span className="text-sm text-green-600">
-                                  {formatCurrencyWithSymbol(expense.amount)}
-                                </span>
+                        {recurringExpenses.map((expense) => {
+                          const today = new Date();
+                          const isOverdue = expense.nextPaymentDate < today;
+                          return (
+                            <SelectItem key={expense.id} value={expense.id}>
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="font-medium">{expense.name}</span>
+                                  <span className="text-sm text-green-600">
+                                    {formatCurrencyWithSymbol(expense.amount)}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {isOverdue ? 'Vencido: ' : 'Vence: '}
+                                  {expense.nextPaymentDate.toLocaleDateString('es-ES')}
+                                  {isOverdue && <span className="ml-1 text-red-500 font-medium">(PENDIENTE)</span>}
+                                </div>
                               </div>
-                              <div className="text-xs text-gray-500">
-                                Vence: {expense.nextPaymentDate.toLocaleDateString('es-ES')}
-                              </div>
-                            </div>
-                          </SelectItem>
-                        ))}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                     {selectedRecurringExpense && (
