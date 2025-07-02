@@ -63,6 +63,17 @@ const DeleteTransactionDialog: React.FC<DeleteTransactionDialogProps> = ({
     setLoading(true);
 
     try {
+      // Verificar si es una transacción de MSI
+      if (transaction.isInstallment && transaction.installmentPlanId) {
+        toast({
+          title: 'No se puede eliminar',
+          description: 'Las transacciones de meses sin intereses no se pueden eliminar directamente. Debes cancelar el plan de pagos desde la sección de cuentas.',
+          variant: 'destructive',
+        });
+        onClose();
+        return;
+      }
+
       // Revertir el efecto en la cuenta
       await updateAccountBalance(transaction.accountId, transaction.amount, transaction.type);
       

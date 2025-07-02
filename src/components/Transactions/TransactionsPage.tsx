@@ -157,6 +157,15 @@ const TransactionsPage: React.FC = () => {
   };
 
   const handleEditTransaction = (transaction: Transaction) => {
+    // Verificar si es una transacción de MSI
+    if (transaction.isInstallment) {
+      toast({
+        title: 'No se puede editar',
+        description: 'Las transacciones de meses sin intereses no se pueden editar directamente. Debes modificar el plan de pagos desde la sección de cuentas.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setEditingTransaction(transaction);
     setIsFormOpen(true);
   };
@@ -180,13 +189,13 @@ const TransactionsPage: React.FC = () => {
   };
 
   const getTotalIncome = () => {
-    return transactions
+    return allTransactions
       .filter(t => t.type === 'income')
       .reduce((sum, t) => sum + t.amount, 0);
   };
 
   const getTotalExpenses = () => {
-    return transactions
+    return allTransactions
       .filter(t => t.type === 'expense')
       .reduce((sum, t) => sum + t.amount, 0);
   };
