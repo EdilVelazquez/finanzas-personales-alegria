@@ -7,11 +7,13 @@ import { useAllTransactions } from '@/hooks/useAllTransactions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Plus, ArrowUpCircle, ArrowDownCircle, Edit, Trash2, Calendar as CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import TransactionForm from './TransactionForm';
 import DeleteTransactionDialog from './DeleteTransactionDialog';
 import { formatCurrencyWithSymbol } from '@/lib/formatCurrency';
+import { defaultCategories } from '@/data/categories';
 import {
   Select,
   SelectContent,
@@ -49,6 +51,8 @@ const TransactionsPage: React.FC = () => {
   
   // Estados para filtros simplificados
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<'current_month' | 'previous_month' | 'custom'>('current_month');
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
@@ -111,6 +115,16 @@ const TransactionsPage: React.FC = () => {
       filteredTransactions = filteredTransactions.filter(t => t.accountId === selectedAccountId);
     }
     
+    // Filtro por tipo
+    if (typeFilter !== 'all') {
+      filteredTransactions = filteredTransactions.filter(t => t.type === typeFilter);
+    }
+    
+    // Filtro por categoría
+    if (categoryFilter !== 'all') {
+      filteredTransactions = filteredTransactions.filter(t => t.category === categoryFilter);
+    }
+    
     // Filtro por fecha
     const { startDate, endDate } = getDateRange();
     filteredTransactions = filteredTransactions.filter(t => 
@@ -119,7 +133,7 @@ const TransactionsPage: React.FC = () => {
     
     setTransactions(filteredTransactions);
     setLoading(transactionsLoading);
-  }, [allTransactions, selectedAccountId, dateFilter, customStartDate, customEndDate, transactionsLoading]);
+  }, [allTransactions, selectedAccountId, typeFilter, categoryFilter, dateFilter, customStartDate, customEndDate, transactionsLoading]);
 
   // Función para calcular el saldo acumulado por cuenta
   const calculateRunningBalance = () => {
@@ -283,48 +297,85 @@ const TransactionsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Filtros mejorados */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Filtro de período */}
-        <Card className="p-4">
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Período</Label>
-            <Select value={dateFilter} onValueChange={(value: any) => setDateFilter(value)}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="current_month">Mes actual</SelectItem>
-                <SelectItem value="previous_month">Mes anterior</SelectItem>
-                <SelectItem value="custom">Personalizado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </Card>
+      {/* Filtros mejorados con tabs */}
+      <div className="space-y-4">
+        {/* Tabs para tipo de transacción */}
+        <Tabs value={typeFilter} onValueChange={(value: any) => setTypeFilter(value)}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="all">Todas</TabsTrigger>
+            <TabsTrigger value="income">Ingresos</TabsTrigger>
+            <TabsTrigger value="expense">Gastos</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-        {/* Filtro de cuenta */}
-        <Card className="p-4">
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Cuenta</Label>
-            <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las cuentas</SelectItem>
-                {accounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </Card>
+        {/* Filtros adicionales */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Filtro de período */}
+          <Card className="p-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Período</Label>
+              <Select value={dateFilter} onValueChange={(value: any) => setDateFilter(value)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background">
+                  <SelectItem value="current_month">Mes actual</SelectItem>
+                  <SelectItem value="previous_month">Mes anterior</SelectItem>
+                  <SelectItem value="custom">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </Card>
+
+          {/* Filtro de cuenta */}
+          <Card className="p-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Cuenta</Label>
+              <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background">
+                  <SelectItem value="all">Todas las cuentas</SelectItem>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </Card>
+
+          {/* Filtro de categoría */}
+          <Card className="p-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Categoría</Label>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background">
+                  <SelectItem value="all">Todas las categorías</SelectItem>
+                  {defaultCategories
+                    .filter(cat => typeFilter === 'all' || cat.type === typeFilter)
+                    .map((category) => (
+                    <SelectItem key={category.name} value={category.name}>
+                      <div className="flex items-center gap-2">
+                        <span>{category.icon}</span>
+                        <span>{category.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </Card>
+        </div>
 
         {/* Fechas personalizadas */}
         {dateFilter === 'custom' && (
-          <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Card className="p-4">
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Desde</Label>
@@ -345,13 +396,14 @@ const TransactionsPage: React.FC = () => {
                       )}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
+                  <PopoverContent className="w-auto p-0 z-50 bg-background" align="start">
                     <Calendar
                       mode="single"
                       selected={customStartDate}
                       onSelect={setCustomStartDate}
                       disabled={(date) => date > new Date()}
                       initialFocus
+                      className="p-3 pointer-events-auto"
                     />
                   </PopoverContent>
                 </Popover>
@@ -378,7 +430,7 @@ const TransactionsPage: React.FC = () => {
                       )}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
+                  <PopoverContent className="w-auto p-0 z-50 bg-background" align="start">
                     <Calendar
                       mode="single"
                       selected={customEndDate}
@@ -388,12 +440,13 @@ const TransactionsPage: React.FC = () => {
                         (customStartDate && date < customStartDate)
                       }
                       initialFocus
+                      className="p-3 pointer-events-auto"
                     />
                   </PopoverContent>
                 </Popover>
               </div>
             </Card>
-          </>
+          </div>
         )}
       </div>
 
