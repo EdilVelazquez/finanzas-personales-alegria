@@ -26,8 +26,7 @@ export const useAllTransactions = () => {
     // Escuchar planes de installment activos
     const installmentPlansQuery = query(
       collection(db, 'users', currentUser.uid, 'installmentPlans'),
-      where('isActive', '==', true),
-      orderBy('nextPaymentDate', 'asc')
+      where('isActive', '==', true)
     );
 
     const unsubscribeTransactions = onSnapshot(transactionsQuery, (snapshot) => {
