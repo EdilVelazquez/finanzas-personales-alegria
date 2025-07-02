@@ -41,15 +41,16 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
   };
 
   const getUpcomingExpensesUntilNextIncome = () => {
-    const nextIncomeDate = getNextPaymentDate(recurringIncomes);
-    if (!nextIncomeDate) return 0;
+    // Calcular pagos para los próximos 15 días (quincena)
+    const today = new Date();
+    const biweeklyDate = new Date(today.getTime() + (15 * 24 * 60 * 60 * 1000));
 
     const recurringTotal = recurringExpenses
-      .filter(expense => expense.nextPaymentDate <= nextIncomeDate)
+      .filter(expense => expense.nextPaymentDate <= biweeklyDate)
       .reduce((total, expense) => total + expense.amount, 0);
 
     const installmentTotal = installmentPlans
-      .filter(plan => plan.isActive && plan.nextPaymentDate <= nextIncomeDate)
+      .filter(plan => plan.isActive && plan.nextPaymentDate <= biweeklyDate)
       .reduce((total, plan) => total + plan.monthlyAmount, 0);
 
     return recurringTotal + installmentTotal;
@@ -157,12 +158,13 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
             {activeModal === 'payments' && (
               <div className="space-y-3">
                 <p className="text-sm text-gray-600 mb-4">
-                  Pagos programados hasta tu próximo ingreso
+                  Pagos programados para los próximos 15 días (quincena)
                 </p>
                 {recurringExpenses
                   .filter(expense => {
-                    const nextIncomeDate = getNextPaymentDate(recurringIncomes);
-                    return nextIncomeDate && expense.nextPaymentDate <= nextIncomeDate;
+                    const today = new Date();
+                    const biweeklyDate = new Date(today.getTime() + (15 * 24 * 60 * 60 * 1000));
+                    return expense.nextPaymentDate <= biweeklyDate;
                   })
                   .map(expense => (
                     <div key={expense.id} className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
@@ -180,8 +182,9 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                 
                 {installmentPlans
                   .filter(plan => {
-                    const nextIncomeDate = getNextPaymentDate(recurringIncomes);
-                    return plan.isActive && nextIncomeDate && plan.nextPaymentDate <= nextIncomeDate;
+                    const today = new Date();
+                    const biweeklyDate = new Date(today.getTime() + (15 * 24 * 60 * 60 * 1000));
+                    return plan.isActive && plan.nextPaymentDate <= biweeklyDate;
                   })
                   .map(plan => (
                     <div key={plan.id} className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
