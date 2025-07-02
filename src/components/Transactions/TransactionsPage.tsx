@@ -470,7 +470,6 @@ const TransactionsPage: React.FC = () => {
               size="sm"
               onClick={() => setGroupByMonth(!groupByMonth)}
             >
-              <Calendar className="h-4 w-4 mr-2" />
               {groupByMonth ? 'Lista' : 'Agrupar'}
             </Button>
           </div>

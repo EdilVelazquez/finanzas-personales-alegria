@@ -78,7 +78,17 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange }) 
                 </SheetContent>
               </Sheet>
               
-              <h1 className="text-lg sm:text-xl font-bold text-blue-600 ml-2">FinanzApp</h1>
+              <div className="flex items-center gap-2 ml-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onPageChange('dashboard')}
+                  className="p-1"
+                >
+                  <Home className="h-4 w-4" />
+                </Button>
+                <h1 className="text-lg sm:text-xl font-bold text-blue-600">FinanzApp</h1>
+              </div>
             </div>
             
             <div className="flex items-center space-x-2 sm:space-x-4">
