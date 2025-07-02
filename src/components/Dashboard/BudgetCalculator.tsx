@@ -31,74 +31,72 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
   };
 
   const getDaysUntilNextPayment = () => {
-    const nextPayment = getNextPaymentDate(recurringIncomes);
-    if (!nextPayment) return 15; // Por defecto 15 días (quincenal)
-    
     const today = new Date();
-    const diffTime = nextPayment.getTime() - today.getTime();
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const diffTime = endOfMonth.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(1, Math.min(diffDays, 15)); // Máximo 15 días
+    return Math.max(1, diffDays); // Días restantes del mes
   };
 
   const getUpcomingExpensesUntilNextIncome = () => {
-    // Calcular pagos para los próximos 15 días (quincena)
+    // Calcular pagos para el resto del mes
     const today = new Date();
-    const biweeklyDate = new Date(today.getTime() + (15 * 24 * 60 * 60 * 1000));
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     const recurringTotal = recurringExpenses
-      .filter(expense => expense.nextPaymentDate <= biweeklyDate)
+      .filter(expense => expense.nextPaymentDate <= endOfMonth)
       .reduce((total, expense) => total + expense.amount, 0);
 
     const installmentTotal = installmentPlans
-      .filter(plan => plan.isActive && plan.nextPaymentDate <= biweeklyDate)
+      .filter(plan => plan.isActive && plan.nextPaymentDate <= endOfMonth)
       .reduce((total, plan) => total + plan.monthlyAmount, 0);
 
     return recurringTotal + installmentTotal;
   };
 
-  const getBiweeklyRecurringIncome = () => {
+  const getMonthlyRecurringIncome = () => {
     return recurringIncomes.reduce((total, income) => {
       switch (income.frequency) {
-        case 'weekly': return total + (income.amount * 2); // 2 semanas
-        case 'biweekly': return total + income.amount; // Ya es quincenal
-        case 'monthly': return total + (income.amount / 2); // Mitad del mes
+        case 'weekly': return total + (income.amount * 4); // 4 semanas
+        case 'biweekly': return total + (income.amount * 2); // 2 quincenas
+        case 'monthly': return total + income.amount; // Ya es mensual
         default: return total;
       }
     }, 0);
   };
 
-  const getBiweeklyRecurringExpenses = () => {
+  const getMonthlyRecurringExpenses = () => {
     return recurringExpenses.reduce((total, expense) => {
       switch (expense.frequency) {
-        case 'weekly': return total + (expense.amount * 2); // 2 semanas
-        case 'biweekly': return total + expense.amount; // Ya es quincenal
-        case 'monthly': return total + (expense.amount / 2); // Mitad del mes
+        case 'weekly': return total + (expense.amount * 4); // 4 semanas
+        case 'biweekly': return total + (expense.amount * 2); // 2 quincenas
+        case 'monthly': return total + expense.amount; // Ya es mensual
         default: return total;
       }
     }, 0);
   };
 
-  const getBiweeklyInstallmentPayments = () => {
+  const getMonthlyInstallmentPayments = () => {
     return installmentPlans
       .filter(plan => plan.isActive)
-      .reduce((total, plan) => total + (plan.monthlyAmount / 2), 0); // Mitad del pago mensual
+      .reduce((total, plan) => total + plan.monthlyAmount, 0); // Pago mensual completo
   };
 
   const daysUntilPayment = getDaysUntilNextPayment();
-  const biweeklyIncome = getBiweeklyRecurringIncome();
-  const biweeklyExpenses = getBiweeklyRecurringExpenses();
-  const biweeklyInstallments = getBiweeklyInstallmentPayments();
+  const monthlyIncome = getMonthlyRecurringIncome();
+  const monthlyExpenses = getMonthlyRecurringExpenses();
+  const monthlyInstallments = getMonthlyInstallmentPayments();
   
-  // Calcular dinero apartado para gastos quincenales
-  const moneyForExpenses = biweeklyExpenses + biweeklyInstallments;
+  // Calcular dinero apartado para gastos mensuales
+  const moneyForExpenses = monthlyExpenses + monthlyInstallments;
   
   // Dinero libre después de gastos programados
-  const netBiweeklyIncome = biweeklyIncome - moneyForExpenses;
+  const netMonthlyIncome = monthlyIncome - moneyForExpenses;
   const upcomingExpenses = getUpcomingExpensesUntilNextIncome();
   
-  // Dinero libre = dinero actual + próximo ingreso quincenal - gastos programados
-  const freeMoney = totalDebitBalance + biweeklyIncome - upcomingExpenses;
-  const dailyBudget = Math.max(0, freeMoney / 15); // Siempre dividir entre 15 días
+  // Dinero libre = dinero actual + próximo ingreso mensual - gastos programados
+  const freeMoney = totalDebitBalance + monthlyIncome - upcomingExpenses;
+  const dailyBudget = Math.max(0, freeMoney / daysUntilPayment); // Dividir entre días restantes del mes
 
   const nextPaymentDate = getNextPaymentDate(recurringIncomes);
   const nextExpenseDate = getNextPaymentDate(recurringExpenses);
@@ -158,13 +156,13 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
             {activeModal === 'payments' && (
               <div className="space-y-3">
                 <p className="text-sm text-gray-600 mb-4">
-                  Pagos programados para los próximos 15 días (quincena)
+                  Pagos programados para el resto del mes
                 </p>
                 {recurringExpenses
                   .filter(expense => {
                     const today = new Date();
-                    const biweeklyDate = new Date(today.getTime() + (15 * 24 * 60 * 60 * 1000));
-                    return expense.nextPaymentDate <= biweeklyDate;
+                    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    return expense.nextPaymentDate <= endOfMonth;
                   })
                   .map(expense => (
                     <div key={expense.id} className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
@@ -183,8 +181,8 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                 {installmentPlans
                   .filter(plan => {
                     const today = new Date();
-                    const biweeklyDate = new Date(today.getTime() + (15 * 24 * 60 * 60 * 1000));
-                    return plan.isActive && plan.nextPaymentDate <= biweeklyDate;
+                    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    return plan.isActive && plan.nextPaymentDate <= endOfMonth;
                   })
                   .map(plan => (
                     <div key={plan.id} className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
@@ -248,9 +246,9 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                 
                 <div className="border-t pt-3 mt-3">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold">Total quincenal:</span>
+                    <span className="font-bold">Total mensual:</span>
                     <span className="font-bold text-blue-600 text-lg">
-                      {formatCurrencyWithSymbol(biweeklyInstallments)}
+                      {formatCurrencyWithSymbol(monthlyInstallments)}
                     </span>
                   </div>
                 </div>
@@ -294,7 +292,7 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                         {formatCurrencyWithSymbol(dailyBudget)}
                       </p>
                       <p className="text-xs text-gray-500">
-                        Para los próximos 15 días (quincena)
+                        Para los próximos {daysUntilPayment} días del mes
                       </p>
                     </div>
                   )}
@@ -338,7 +336,7 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
               {formatCurrencyWithSymbol(upcomingExpenses)}
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              {upcomingExpenses === 0 ? 'No hay pagos próximos' : 'Hasta el próximo ingreso'}
+              {upcomingExpenses === 0 ? 'No hay pagos próximos' : 'Resto del mes'}
             </p>
           </CardContent>
         </Card>
@@ -352,9 +350,9 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {formatCurrencyWithSymbol(biweeklyInstallments)}
+              {formatCurrencyWithSymbol(monthlyInstallments)}
             </div>
-            <p className="text-xs text-gray-500 mt-1">Quincenal total</p>
+            <p className="text-xs text-gray-500 mt-1">Mensual total</p>
           </CardContent>
         </Card>
 
@@ -448,10 +446,10 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                   <div className="text-3xl font-bold text-green-600">
                     {formatCurrencyWithSymbol(dailyBudget)}
                   </div>
-                  <p className="text-sm text-gray-600 mt-1">Límite diario de gastos</p>
-                  <p className="text-xs text-gray-500">
-                    Basado en dinero libre para 15 días (quincena)
-                  </p>
+                    <p className="text-sm text-gray-600 mt-1">Límite diario de gastos</p>
+                    <p className="text-xs text-gray-500">
+                      Basado en dinero libre para {daysUntilPayment} días restantes del mes
+                    </p>
                 </div>
               ) : (
                 <div className="text-center p-4 bg-red-50 rounded-lg">
@@ -486,24 +484,24 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
 
             <div className="space-y-4">
               <div className="p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-medium text-gray-700 mb-3">Resumen Quincenal</h4>
+                <h4 className="font-medium text-gray-700 mb-3">Resumen Mensual</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Ingresos quincenales:</span>
+                    <span className="text-sm text-gray-600">Ingresos mensuales:</span>
                     <span className="font-medium text-green-600">
-                      +{formatCurrencyWithSymbol(biweeklyIncome)}
+                      +{formatCurrencyWithSymbol(monthlyIncome)}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Gastos quincenales:</span>
+                    <span className="text-sm text-gray-600">Gastos mensuales:</span>
                     <span className="font-medium text-red-600">
-                      -{formatCurrencyWithSymbol(biweeklyExpenses)}
+                      -{formatCurrencyWithSymbol(monthlyExpenses)}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">MSI quincenales:</span>
+                    <span className="text-sm text-gray-600">MSI mensuales:</span>
                     <span className="font-medium text-blue-600">
-                      -{formatCurrencyWithSymbol(biweeklyInstallments)}
+                      -{formatCurrencyWithSymbol(monthlyInstallments)}
                     </span>
                   </div>
                   <div className="flex justify-between bg-orange-100 p-2 rounded">
@@ -515,8 +513,8 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                   <hr className="my-2" />
                   <div className="flex justify-between">
                     <span className="font-medium text-gray-700">Disponible para extras:</span>
-                    <span className={`font-bold ${netBiweeklyIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatCurrencyWithSymbol(netBiweeklyIncome)}
+                    <span className={`font-bold ${netMonthlyIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrencyWithSymbol(netMonthlyIncome)}
                     </span>
                   </div>
                 </div>
