@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { RecurringExpense } from '@/types';
-import { defaultCategories } from '@/data/categories';
+import { useCategories } from '@/hooks/useCategories';
 import {
   Dialog,
   DialogContent,
@@ -58,6 +58,7 @@ interface FormData {
 const RecurringExpenseForm: React.FC<RecurringExpenseFormProps> = ({ open, onClose, expense }) => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
+  const { expenseCategories } = useCategories();
   const [loading, setLoading] = useState(false);
 
   const form = useForm<FormData>({
@@ -97,9 +98,6 @@ const RecurringExpenseForm: React.FC<RecurringExpenseFormProps> = ({ open, onClo
     return true;
   };
 
-  const getExpenseCategories = () => {
-    return defaultCategories.filter(cat => cat.type === 'expense');
-  };
 
   const onSubmit = async (data: FormData) => {
     if (!currentUser) return;
@@ -223,7 +221,7 @@ const RecurringExpenseForm: React.FC<RecurringExpenseFormProps> = ({ open, onClo
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {getExpenseCategories().map((category) => (
+                      {expenseCategories.map((category) => (
                         <SelectItem key={category.name} value={category.name}>
                           <div className="flex items-center gap-2">
                             <span>{category.icon}</span>

@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useCategories } from '@/hooks/useCategories';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +19,6 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Account } from '@/types';
-import { defaultCategories } from '@/data/categories';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar as CalendarIcon, X } from 'lucide-react';
@@ -43,6 +43,7 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
   onFiltersChange,
   accounts
 }) => {
+  const { categories } = useCategories();
   const handleFilterChange = (key: keyof TransactionFilters, value: any) => {
     onFiltersChange({
       ...filters,
@@ -168,7 +169,7 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
-                {defaultCategories.map((category) => (
+                {categories.map((category) => (
                   <SelectItem key={category.name} value={category.name}>
                     <div className="flex items-center gap-2">
                       <span>{category.icon}</span>

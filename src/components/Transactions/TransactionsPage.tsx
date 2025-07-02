@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import TransactionForm from './TransactionForm';
 import DeleteTransactionDialog from './DeleteTransactionDialog';
 import { formatCurrencyWithSymbol } from '@/lib/formatCurrency';
-import { defaultCategories } from '@/data/categories';
+import { useCategories } from '@/hooks/useCategories';
 import {
   Select,
   SelectContent,
@@ -43,6 +43,7 @@ const TransactionsPage: React.FC = () => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const { transactions: allTransactions, loading: transactionsLoading } = useAllTransactions();
+  const { categories } = useCategories();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -53,7 +54,7 @@ const TransactionsPage: React.FC = () => {
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [dateFilter, setDateFilter] = useState<'current_month' | 'previous_month' | 'custom'>('current_month');
+  const [dateFilter, setDateFilter] = useState<'all' | 'current_month' | 'previous_month' | 'custom'>('current_month');
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
   
@@ -86,6 +87,10 @@ const TransactionsPage: React.FC = () => {
     let startDate: Date, endDate: Date;
 
     switch (dateFilter) {
+      case 'all':
+        startDate = new Date(2020, 0, 1); // Fecha muy anterior
+        endDate = new Date(2030, 11, 31); // Fecha muy posterior
+        break;
       case 'current_month':
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -319,6 +324,7 @@ const TransactionsPage: React.FC = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-background">
+                  <SelectItem value="all">Todo</SelectItem>
                   <SelectItem value="current_month">Mes actual</SelectItem>
                   <SelectItem value="previous_month">Mes anterior</SelectItem>
                   <SelectItem value="custom">Personalizado</SelectItem>
@@ -357,7 +363,7 @@ const TransactionsPage: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent className="bg-background">
                   <SelectItem value="all">Todas las categorías</SelectItem>
-                  {defaultCategories
+                  {categories
                     .filter(cat => typeFilter === 'all' || cat.type === typeFilter)
                     .map((category) => (
                     <SelectItem key={category.name} value={category.name}>

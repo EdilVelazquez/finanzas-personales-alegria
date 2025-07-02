@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, query, onSnapshot, orderBy, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Account, Transaction, RecurringExpense, InstallmentPlan } from '@/types';
-import { defaultCategories } from '@/data/categories';
+import { useCategories } from '@/hooks/useCategories';
 import {
   Dialog,
   DialogContent,
@@ -64,6 +64,7 @@ interface FormData {
 const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transaction, accounts }) => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
+  const { categories } = useCategories();
   const [loading, setLoading] = useState(false);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
 
@@ -259,7 +260,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
   };
 
   const getAvailableCategories = () => {
-    return defaultCategories.filter(cat => cat.type === watchType);
+    return categories.filter(cat => cat.type === watchType);
   };
 
   const getAvailableAccounts = () => {
@@ -525,7 +526,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                    <PopoverContent className="w-auto p-0 z-50 bg-background" align="start">
                       <Calendar
                         mode="single"
                         selected={field.value}
