@@ -33,11 +33,15 @@ const AccountsPage: React.FC = () => {
     );
 
     const unsubscribe = onSnapshot(accountsQuery, (snapshot) => {
-      const accountsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate()
-      })) as Account[];
+      const accountsData = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate(),
+          nextPaymentDate: data.nextPaymentDate?.toDate()
+        };
+      }) as Account[];
       setAccounts(accountsData);
     });
 
