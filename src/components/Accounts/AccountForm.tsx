@@ -39,11 +39,15 @@ interface AccountFormProps {
 
 interface FormData {
   name: string;
-  type: 'debit' | 'credit';
+  type: 'debit' | 'credit' | 'debt';
   balance: string;
   creditLimit: string;
   cutoffDate: string;
   paymentDueDate: string;
+  totalDebt: string;
+  paidAmount: string;
+  totalMonths: string;
+  monthlyPaymentDay: string;
 }
 
 const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accounts }) => {
@@ -59,6 +63,10 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
       creditLimit: '0',
       cutoffDate: '1',
       paymentDueDate: '20',
+      totalDebt: '0',
+      paidAmount: '0',
+      totalMonths: '12',
+      monthlyPaymentDay: '1',
     },
   });
 
@@ -73,6 +81,10 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
         creditLimit: (account.creditLimit || 0).toString(),
         cutoffDate: (account.cutoffDate || 1).toString(),
         paymentDueDate: (account.paymentDueDate || 20).toString(),
+        totalDebt: (account.totalDebt || 0).toString(),
+        paidAmount: account.totalDebt ? ((account.totalDebt - account.balance) || 0).toString() : '0',
+        totalMonths: (account.totalMonths || 12).toString(),
+        monthlyPaymentDay: account.nextPaymentDate ? account.nextPaymentDate.getDate().toString() : '1',
       });
     } else {
       form.reset({
@@ -82,6 +94,10 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
         creditLimit: '0',
         cutoffDate: '1',
         paymentDueDate: '20',
+        totalDebt: '0',
+        paidAmount: '0',
+        totalMonths: '12',
+        monthlyPaymentDay: '1',
       });
     }
   }, [account, form]);
@@ -137,13 +153,37 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
           ...baseData,
           balance: parseFloat(data.balance),
         };
-      } else {
+      } else if (data.type === 'credit') {
         accountData = {
           ...baseData,
           balance: parseFloat(data.balance) || 0,
           creditLimit: parseFloat(data.creditLimit),
           cutoffDate: parseInt(data.cutoffDate),
           paymentDueDate: parseInt(data.paymentDueDate),
+        };
+      } else if (data.type === 'debt') {
+        const totalDebt = parseFloat(data.totalDebt);
+        const paidAmount = parseFloat(data.paidAmount) || 0;
+        const totalMonths = parseInt(data.totalMonths);
+        const remainingDebt = totalDebt - paidAmount;
+        const monthlyPayment = remainingDebt / (totalMonths - (paidAmount > 0 ? Math.floor(paidAmount / (totalDebt / totalMonths)) : 0));
+        const remainingMonths = Math.ceil(remainingDebt / monthlyPayment);
+        
+        // Calcular próxima fecha de pago
+        const today = new Date();
+        const nextPaymentDate = new Date(today.getFullYear(), today.getMonth(), parseInt(data.monthlyPaymentDay));
+        if (nextPaymentDate <= today) {
+          nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+        }
+
+        accountData = {
+          ...baseData,
+          balance: remainingDebt, // balance representa la deuda restante
+          totalDebt,
+          monthlyPayment: isFinite(monthlyPayment) ? monthlyPayment : 0,
+          totalMonths,
+          remainingMonths: remainingMonths > 0 ? remainingMonths : 0,
+          nextPaymentDate,
         };
       }
 
@@ -230,6 +270,7 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
                     <SelectContent>
                       <SelectItem value="debit">Débito</SelectItem>
                       <SelectItem value="credit">Crédito</SelectItem>
+                      <SelectItem value="debt">Deuda</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -352,6 +393,117 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Fecha Límite de Pago</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={loading}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Día" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {dayOptions.map(day => (
+                              <SelectItem key={day} value={day.toString()}>
+                                {day}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </>
+            )}
+
+            {watchType === 'debt' && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="totalDebt"
+                  rules={{
+                    required: 'El total de la deuda es obligatorio',
+                    validate: (value) => validateAmount(value, 'El total de la deuda'),
+                  }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Total de la deuda</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          placeholder="0.00" 
+                          {...field}
+                          disabled={loading}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="paidAmount"
+                  rules={{
+                    validate: (value) => validateAmount(value, 'El monto pagado'),
+                  }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>¿Cuánto has pagado? (opcional)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          placeholder="0.00" 
+                          {...field}
+                          disabled={loading}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="totalMonths"
+                    rules={{
+                      required: 'Los meses son obligatorios',
+                      validate: (value) => {
+                        const months = parseInt(value);
+                        if (isNaN(months)) return 'Debe ser un número válido';
+                        if (months < 1) return 'Debe ser al menos 1 mes';
+                        if (months > 360) return 'No puede ser más de 360 meses';
+                        return true;
+                      },
+                    }}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>¿A cuántos meses?</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            placeholder="12" 
+                            {...field}
+                            disabled={loading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="monthlyPaymentDay"
+                    rules={{
+                      required: 'El día de pago es obligatorio',
+                      validate: (value) => validateDay(value, 'El día de pago'),
+                    }}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Día de pago mensual</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value} disabled={loading}>
                           <FormControl>
                             <SelectTrigger>

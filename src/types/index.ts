@@ -2,7 +2,7 @@
 export interface Account {
   id: string;
   name: string;
-  type: 'debit' | 'credit';
+  type: 'debit' | 'credit' | 'debt';
   balance: number;
   creditLimit?: number;
   userId: string;
@@ -10,6 +10,12 @@ export interface Account {
   // Nuevos campos para tarjetas de crédito
   cutoffDate?: number; // Día del mes (1-31)
   paymentDueDate?: number; // Día del mes (1-31)
+  // Nuevos campos para cuentas de deuda
+  totalDebt?: number; // Total original de la deuda
+  monthlyPayment?: number; // Pago mensual
+  totalMonths?: number; // Total de meses del préstamo
+  remainingMonths?: number; // Meses restantes
+  nextPaymentDate?: Date; // Próxima fecha de pago
 }
 
 export interface Transaction {
