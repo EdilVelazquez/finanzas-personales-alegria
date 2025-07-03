@@ -29,6 +29,8 @@ import {
 } from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrencyWithSymbol } from '@/lib/formatCurrency';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface AccountFormProps {
   open: boolean;
@@ -71,6 +73,30 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
   });
 
   const watchType = form.watch('type');
+  const watchTotalDebt = form.watch('totalDebt');
+  const watchPaidAmount = form.watch('paidAmount');
+  const watchTotalMonths = form.watch('totalMonths');
+
+  // Cálculos en tiempo real para deudas
+  const debtCalculations = React.useMemo(() => {
+    if (watchType !== 'debt') return null;
+    
+    const totalDebt = parseFloat(watchTotalDebt) || 0;
+    const paidAmount = parseFloat(watchPaidAmount) || 0;
+    const totalMonths = parseInt(watchTotalMonths) || 12;
+    
+    const remainingDebt = totalDebt - paidAmount;
+    const monthlyPayment = totalDebt / totalMonths; // Pago mensual fijo basado en deuda total
+    const remainingMonths = remainingDebt > 0 ? Math.ceil(remainingDebt / monthlyPayment) : 0;
+    
+    return {
+      remainingDebt: Math.max(remainingDebt, 0),
+      monthlyPayment,
+      remainingMonths,
+      totalDebt,
+      paidAmount
+    };
+  }, [watchType, watchTotalDebt, watchPaidAmount, watchTotalMonths]);
 
   useEffect(() => {
     if (account) {
@@ -166,8 +192,8 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
         const paidAmount = parseFloat(data.paidAmount) || 0;
         const totalMonths = parseInt(data.totalMonths);
         const remainingDebt = totalDebt - paidAmount;
-        const monthlyPayment = remainingDebt / (totalMonths - (paidAmount > 0 ? Math.floor(paidAmount / (totalDebt / totalMonths)) : 0));
-        const remainingMonths = Math.ceil(remainingDebt / monthlyPayment);
+        const monthlyPayment = totalDebt / totalMonths; // Pago mensual fijo basado en deuda total
+        const remainingMonths = remainingDebt > 0 ? Math.ceil(remainingDebt / monthlyPayment) : 0;
         
         // Calcular próxima fecha de pago
         const today = new Date();
@@ -178,11 +204,11 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
 
         accountData = {
           ...baseData,
-          balance: remainingDebt, // balance representa la deuda restante
+          balance: Math.max(remainingDebt, 0), // balance representa la deuda restante
           totalDebt,
-          monthlyPayment: isFinite(monthlyPayment) ? monthlyPayment : 0,
+          monthlyPayment,
           totalMonths,
-          remainingMonths: remainingMonths > 0 ? remainingMonths : 0,
+          remainingMonths,
           nextPaymentDate,
         };
       }
@@ -522,9 +548,40 @@ const AccountForm: React.FC<AccountFormProps> = ({ open, onClose, account, accou
                       </FormItem>
                     )}
                   />
-                </div>
-              </>
-            )}
+                 </div>
+
+                 {/* Vista previa de cálculos para deudas */}
+                 {debtCalculations && debtCalculations.totalDebt > 0 && (
+                   <Card className="bg-blue-50 border-blue-200">
+                     <CardHeader className="pb-3">
+                       <CardTitle className="text-lg text-blue-800">Vista Previa de Cálculos</CardTitle>
+                     </CardHeader>
+                     <CardContent className="space-y-2">
+                       <div className="flex justify-between">
+                         <span className="text-gray-600">Deuda total:</span>
+                         <span className="font-medium">{formatCurrencyWithSymbol(debtCalculations.totalDebt)}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span className="text-gray-600">Ya pagado:</span>
+                         <span className="font-medium text-green-600">{formatCurrencyWithSymbol(debtCalculations.paidAmount)}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span className="text-gray-600">Restante:</span>
+                         <span className="font-bold text-red-600">{formatCurrencyWithSymbol(debtCalculations.remainingDebt)}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span className="text-gray-600">Pago mensual:</span>
+                         <span className="font-bold text-blue-600">{formatCurrencyWithSymbol(debtCalculations.monthlyPayment)}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span className="text-gray-600">Meses restantes:</span>
+                         <span className="font-bold text-orange-600">{debtCalculations.remainingMonths}</span>
+                       </div>
+                     </CardContent>
+                   </Card>
+                 )}
+               </>
+             )}
 
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
