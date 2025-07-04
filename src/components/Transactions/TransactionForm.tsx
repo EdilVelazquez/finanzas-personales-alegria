@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, query, onSnapshot, orderBy, where } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, query, onSnapshot, orderBy, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Account, Transaction, RecurringExpense, InstallmentPlan } from '@/types';
 import { useCategories } from '@/hooks/useCategories';
@@ -189,23 +189,44 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
     return true;
   };
 
-  const updateAccountBalance = async (accountId: string, amount: number, type: 'income' | 'expense', isReversal = false) => {
+  const recalculateAccountBalance = async (accountId: string) => {
     const account = accounts.find(acc => acc.id === accountId);
     if (!account) return;
 
-    let newBalance = account.balance;
-    
-    if (account.type === 'debit') {
-      if (type === 'income') {
-        newBalance = isReversal ? account.balance - amount : account.balance + amount;
-      } else {
-        newBalance = isReversal ? account.balance + amount : account.balance - amount;
+    // Obtener todas las transacciones de esta cuenta ordenadas por fecha
+    const transactionsQuery = query(
+      collection(db, 'users', currentUser!.uid, 'transactions'),
+      where('accountId', '==', accountId),
+      orderBy('date', 'asc')
+    );
+
+    const snapshot = await getDocs(transactionsQuery);
+    const accountTransactions = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      date: doc.data().date?.toDate() || new Date(),
+    })) as Transaction[];
+
+    // Calcular el balance desde el saldo inicial (0) más las transacciones cronológicamente
+    let newBalance = 0; // Siempre empezar desde 0 ya que quitamos los saldos iniciales virtuales
+
+    for (const trans of accountTransactions) {
+      if (account.type === 'debit') {
+        if (trans.type === 'income') {
+          newBalance += trans.amount;
+        } else {
+          newBalance -= trans.amount;
+        }
+      } else if (account.type === 'credit') {
+        if (trans.type === 'expense') {
+          newBalance += trans.amount;
+        }
+        // Los ingresos no afectan las cuentas de crédito directamente
+      } else if (account.type === 'debt') {
+        if (trans.type === 'expense') {
+          newBalance += trans.amount;
+        }
       }
-    } else if (account.type === 'credit') {
-      if (type === 'expense') {
-        newBalance = isReversal ? account.balance - amount : account.balance + amount;
-      }
-      // Los ingresos no afectan las cuentas de crédito directamente
     }
 
     await updateDoc(doc(db, 'users', currentUser!.uid, 'accounts', accountId), {
@@ -308,14 +329,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
 
       if (transaction) {
         // Actualizar transacción existente
-        // Primero revertir el efecto de la transacción anterior
-        await updateAccountBalance(transaction.accountId, transaction.amount, transaction.type, true);
-        
-        // Actualizar la transacción
         await updateDoc(doc(db, 'users', currentUser.uid, 'transactions', transaction.id), transactionData);
         
-        // Aplicar el nuevo efecto
-        await updateAccountBalance(data.accountId, amount, data.type);
+        // Recalcular saldos de las cuentas involucradas
+        const accountsToRecalculate = new Set([transaction.accountId, data.accountId]);
+        for (const accountId of accountsToRecalculate) {
+          await recalculateAccountBalance(accountId);
+        }
         
         // Si se convirtió a meses sin intereses, crear el plan de pagos
         if (data.useInstallments && data.installmentMonths && data.installmentMonths > 1) {
@@ -343,8 +363,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
           createdAt: serverTimestamp(),
         });
         
-        // Actualizar el saldo de la cuenta
-        await updateAccountBalance(data.accountId, amount, data.type);
+        // Recalcular el saldo de la cuenta
+        await recalculateAccountBalance(data.accountId);
         
         // Si se seleccionó meses sin intereses, crear el plan de pagos
         if (data.useInstallments && data.installmentMonths && data.installmentMonths > 1) {
