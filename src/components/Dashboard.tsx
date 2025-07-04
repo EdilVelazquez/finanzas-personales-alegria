@@ -78,7 +78,8 @@ const Dashboard: React.FC = () => {
       const accountsData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate()
+        createdAt: doc.data().createdAt?.toDate(),
+        nextPaymentDate: doc.data().nextPaymentDate?.toDate()
       })) as Account[];
       setAccounts(accountsData);
     });
@@ -413,7 +414,7 @@ const Dashboard: React.FC = () => {
 
                 // Cuentas de deuda
                 const debtPayments = accounts
-                  .filter(account => account.type === 'debt' && account.nextPaymentDate && account.nextPaymentDate <= endOfMonth)
+                  .filter(account => account.type === 'debt' && account.nextPaymentDate && account.monthlyPayment && account.nextPaymentDate <= endOfMonth)
                   .map(account => ({
                     id: account.id,
                     name: `Pago ${account.name}`,
