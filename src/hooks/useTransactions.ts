@@ -62,23 +62,8 @@ export const useTransactions = (filters: ReportFilters, accounts?: Account[]) =>
           const virtualTransactions = accountsToInclude
             .filter(account => account.balance !== 0) // Solo mostrar cuentas con balance diferente a 0
             .map(account => {
-              // Para cuentas de débito, el saldo inicial es un ingreso
-              if (account.type === 'debit' && account.balance > 0) {
-                return {
-                  id: `virtual-${account.id}`,
-                  type: 'income' as const,
-                  amount: account.balance,
-                  description: `Saldo inicial - ${account.name}`,
-                  category: 'Saldo inicial',
-                  accountId: account.id,
-                  userId: currentUser.uid,
-                  date: account.createdAt || new Date(2024, 0, 1),
-                  createdAt: account.createdAt || new Date(2024, 0, 1),
-                  isVirtual: true
-                };
-              }
               // Para cuentas de crédito, el saldo usado es un gasto
-              else if (account.type === 'credit' && account.balance > 0) {
+              if (account.type === 'credit' && account.balance > 0) {
                 return {
                   id: `virtual-${account.id}`,
                   type: 'expense' as const,
