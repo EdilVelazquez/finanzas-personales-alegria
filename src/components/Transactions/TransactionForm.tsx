@@ -193,11 +193,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
     const account = accounts.find(acc => acc.id === accountId);
     if (!account) return;
 
-    // Obtener todas las transacciones de esta cuenta ordenadas por fecha
+    // Obtener todas las transacciones de esta cuenta sin orden específico para evitar índice compuesto
     const transactionsQuery = query(
       collection(db, 'users', currentUser!.uid, 'transactions'),
-      where('accountId', '==', accountId),
-      orderBy('date', 'asc')
+      where('accountId', '==', accountId)
     );
 
     const snapshot = await getDocs(transactionsQuery);
@@ -206,6 +205,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
       ...doc.data(),
       date: doc.data().date?.toDate() || new Date(),
     })) as Transaction[];
+
+    // Ordenar por fecha en JavaScript después de obtener los datos
+    accountTransactions.sort((a, b) => a.date.getTime() - b.date.getTime());
 
     // Calcular el balance desde el saldo inicial (0) más las transacciones cronológicamente
     let newBalance = 0; // Siempre empezar desde 0 ya que quitamos los saldos iniciales virtuales
