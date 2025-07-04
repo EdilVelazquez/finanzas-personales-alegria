@@ -175,10 +175,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
     const account = accounts.find(acc => acc.id === accountId);
     if (!account) return 'Cuenta no encontrada';
     
+    // Para cuentas de débito, permitir balances negativos (no validar saldo insuficiente)
     if (account.type === 'debit') {
-      if (account.balance < amount) {
-        return 'Saldo insuficiente en la cuenta';
-      }
+      // Permitir gastos sin importar el saldo actual
+      return true;
     } else if (account.type === 'credit') {
       const availableCredit = (account.creditLimit || 0) - account.balance;
       if (availableCredit < amount) {
