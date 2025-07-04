@@ -62,7 +62,35 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
       .filter(plan => plan.isActive && plan.nextPaymentDate <= endOfMonth)
       .reduce((total, plan) => total + plan.monthlyAmount, 0);
 
-    return recurringTotal + installmentTotal;
+    // Agregar pagos de cuentas de deuda
+    const debtPaymentsTotal = accounts
+      .filter(account => account.type === 'debt' && account.nextPaymentDate && account.nextPaymentDate <= endOfMonth)
+      .reduce((total, account) => total + (account.monthlyPayment || 0), 0);
+
+    return recurringTotal + installmentTotal + debtPaymentsTotal;
+  };
+
+  const getUpcomingIncomesUntilNextPayment = () => {
+    // Calcular ingresos para el resto del mes
+    const today = new Date();
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+    let recurringIncomeTotal = 0;
+    
+    recurringIncomes.forEach(income => {
+      if (income.frequency === 'weekly') {
+        // Para ingresos semanales, calcular todos los ingresos que caen en el mes
+        const weeklyPayments = getWeeklyPaymentsInMonth(income.nextPaymentDate, endOfMonth);
+        recurringIncomeTotal += weeklyPayments.length * income.amount;
+      } else {
+        // Para ingresos mensuales y bisemanales, solo el próximo ingreso si está en el mes
+        if (income.nextPaymentDate <= endOfMonth) {
+          recurringIncomeTotal += income.amount;
+        }
+      }
+    });
+
+    return recurringIncomeTotal;
   };
 
   const getWeeklyPaymentsInMonth = (nextPaymentDate: Date, endOfMonth: Date) => {
@@ -116,9 +144,10 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
   // Dinero libre después de gastos programados
   const netMonthlyIncome = monthlyIncome - moneyForExpenses;
   const upcomingExpenses = getUpcomingExpensesUntilNextIncome();
+  const upcomingIncomes = getUpcomingIncomesUntilNextPayment();
   
-  // Dinero libre = dinero actual + próximo ingreso mensual - gastos programados
-  const freeMoney = totalDebitBalance + monthlyIncome - upcomingExpenses;
+  // Dinero libre = dinero actual - gastos programados + ingresos próximos
+  const freeMoney = totalDebitBalance - upcomingExpenses + upcomingIncomes;
   const dailyBudget = Math.max(0, freeMoney / daysUntilPayment); // Dividir entre días restantes del mes
 
   const nextPaymentDate = getNextPaymentDate(recurringIncomes);
@@ -257,6 +286,38 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                           {formatCurrencyWithSymbol(plan.monthlyAmount)}
                         </span>
                       </div>
+                     );
+                   })}
+                
+                {/* Pagos de cuentas de deuda */}
+                {accounts
+                  .filter(account => {
+                    const today = new Date();
+                    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    return account.type === 'debt' && account.nextPaymentDate && account.nextPaymentDate <= endOfMonth;
+                  })
+                  .sort((a, b) => a.nextPaymentDate!.getTime() - b.nextPaymentDate!.getTime())
+                  .map((account, index) => {
+                    const today = new Date();
+                    const isOverdue = account.nextPaymentDate! < today;
+                    const bgColors = ['bg-yellow-50', 'bg-amber-50', 'bg-orange-50'];
+                    const textColors = ['text-yellow-600', 'text-amber-600', 'text-orange-600'];
+                    const bgColor = bgColors[index % bgColors.length];
+                    const textColor = textColors[index % textColors.length];
+                    
+                    return (
+                      <div key={account.id} className={`flex justify-between items-center p-3 ${bgColor} rounded-lg ${isOverdue ? 'border-l-4 border-red-500' : ''}`}>
+                        <div>
+                          <span className="font-medium block">Pago {account.name}</span>
+                          <span className="text-sm text-gray-600">
+                            {account.nextPaymentDate!.toLocaleDateString('es-ES')}
+                            {isOverdue && <span className="ml-2 text-red-500 font-medium">(Vencido)</span>}
+                          </span>
+                        </div>
+                        <span className={`font-bold ${textColor}`}>
+                          {formatCurrencyWithSymbol(account.monthlyPayment || 0)}
+                        </span>
+                      </div>
                     );
                   })}
 
@@ -335,6 +396,13 @@ const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                     <span className="text-sm">Pagos próximos:</span>
                     <span className="font-medium text-red-600">
                       -{formatCurrencyWithSymbol(upcomingExpenses)}
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between p-2 bg-green-50 rounded">
+                    <span className="text-sm">Ingresos próximos:</span>
+                    <span className="font-medium text-green-600">
+                      +{formatCurrencyWithSymbol(upcomingIncomes)}
                     </span>
                   </div>
                   

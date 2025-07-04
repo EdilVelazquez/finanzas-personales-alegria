@@ -374,6 +374,148 @@ const Dashboard: React.FC = () => {
         accounts={accounts}
       />
 
+      {/* Tarjetas de próximos pagos e ingresos */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+        {/* Próximos Pagos */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base sm:text-lg text-red-600">Próximos Pagos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-48 overflow-y-auto">
+              {(() => {
+                const today = new Date();
+                const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                
+                // Gastos recurrentes
+                const upcomingExpenses = recurringExpenses
+                  .filter(expense => expense.nextPaymentDate <= endOfMonth || expense.frequency === 'weekly')
+                  .flatMap(expense => {
+                    if (expense.frequency === 'weekly') {
+                      const weeklyPayments = [];
+                      let currentDate = new Date(expense.nextPaymentDate);
+                      while (currentDate <= endOfMonth) {
+                        weeklyPayments.push({
+                          ...expense,
+                          id: `${expense.id}-${currentDate.getTime()}`,
+                          nextPaymentDate: new Date(currentDate)
+                        });
+                        currentDate.setDate(currentDate.getDate() + 7);
+                      }
+                      return weeklyPayments;
+                    }
+                    return [expense];
+                  });
+
+                // Planes de pago
+                const upcomingInstallments = installmentPlans
+                  .filter(plan => plan.isActive && plan.nextPaymentDate <= endOfMonth);
+
+                // Cuentas de deuda
+                const debtPayments = accounts
+                  .filter(account => account.type === 'debt' && account.nextPaymentDate && account.nextPaymentDate <= endOfMonth)
+                  .map(account => ({
+                    id: account.id,
+                    name: `Pago ${account.name}`,
+                    amount: account.monthlyPayment || 0,
+                    nextPaymentDate: account.nextPaymentDate!,
+                    type: 'debt' as const
+                  }));
+
+                const allUpcomingPayments = [
+                  ...upcomingExpenses.map(e => ({ ...e, type: 'expense' as const })),
+                  ...upcomingInstallments.map(i => ({ ...i, type: 'installment' as const, name: i.description, amount: i.monthlyAmount })),
+                  ...debtPayments
+                ].sort((a, b) => a.nextPaymentDate.getTime() - b.nextPaymentDate.getTime());
+
+                return allUpcomingPayments.length > 0 ? (
+                  allUpcomingPayments.slice(0, 5).map((payment, index) => {
+                    const isOverdue = payment.nextPaymentDate < today;
+                    return (
+                      <div key={payment.id} className={`flex items-center justify-between p-3 bg-red-50 rounded-lg ${isOverdue ? 'border-l-4 border-red-500' : ''}`}>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{payment.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {payment.nextPaymentDate.toLocaleDateString('es-ES')}
+                            {isOverdue && <span className="ml-2 text-red-500 font-medium">(Vencido)</span>}
+                          </p>
+                        </div>
+                        <div className="text-right ml-4 flex-shrink-0">
+                          <p className="font-medium text-sm text-red-600">
+                            -${payment.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-gray-500 text-center py-4 text-sm">No hay pagos próximos</p>
+                );
+              })()}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Próximos Ingresos */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base sm:text-lg text-green-600">Próximos Ingresos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-48 overflow-y-auto">
+              {(() => {
+                const today = new Date();
+                const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                
+                const upcomingIncomes = recurringIncomes
+                  .filter(income => income.nextPaymentDate <= endOfMonth || income.frequency === 'weekly')
+                  .flatMap(income => {
+                    if (income.frequency === 'weekly') {
+                      const weeklyPayments = [];
+                      let currentDate = new Date(income.nextPaymentDate);
+                      while (currentDate <= endOfMonth) {
+                        weeklyPayments.push({
+                          ...income,
+                          id: `${income.id}-${currentDate.getTime()}`,
+                          nextPaymentDate: new Date(currentDate)
+                        });
+                        currentDate.setDate(currentDate.getDate() + 7);
+                      }
+                      return weeklyPayments;
+                    }
+                    return [income];
+                  })
+                  .sort((a, b) => a.nextPaymentDate.getTime() - b.nextPaymentDate.getTime());
+
+                return upcomingIncomes.length > 0 ? (
+                  upcomingIncomes.slice(0, 5).map((income, index) => {
+                    const isOverdue = income.nextPaymentDate < today;
+                    return (
+                      <div key={income.id} className={`flex items-center justify-between p-3 bg-green-50 rounded-lg ${isOverdue ? 'border-l-4 border-orange-500' : ''}`}>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{income.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {income.nextPaymentDate.toLocaleDateString('es-ES')}
+                            {isOverdue && <span className="ml-2 text-orange-500 font-medium">(Pendiente)</span>}
+                          </p>
+                        </div>
+                        <div className="text-right ml-4 flex-shrink-0">
+                          <p className="font-medium text-sm text-green-600">
+                            +${income.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-gray-500 text-center py-4 text-sm">No hay ingresos próximos</p>
+                );
+              })()}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Gráficas principales */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Gráfico de distribución - Responsivo */}
