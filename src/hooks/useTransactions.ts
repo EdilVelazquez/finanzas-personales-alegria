@@ -51,33 +51,73 @@ export const useTransactions = (filters: ReportFilters, accounts?: Account[]) =>
           transactionsData = transactionsData.filter(t => t.date <= filters.endDate!);
         }
 
-        // Agregar saldos iniciales de cuentas de débito como "ingresos" virtuales
+        // Agregar saldos iniciales de todas las cuentas como transacciones virtuales
         // Solo para el cálculo de reportes, no son transacciones reales
         if (accounts && accounts.length > 0) {
-          const debitAccounts = accounts.filter(acc => acc.type === 'debit' && acc.balance > 0);
-          
           // Si hay filtro de cuenta específica, solo incluir esa cuenta
           const accountsToInclude = filters.accountId 
-            ? debitAccounts.filter(acc => acc.id === filters.accountId)
-            : debitAccounts;
+            ? accounts.filter(acc => acc.id === filters.accountId)
+            : accounts;
 
-          const virtualIncomes = accountsToInclude.map(account => ({
-            id: `virtual-${account.id}`,
-            type: 'income' as const,
-            amount: account.balance,
-            description: `Saldo inicial - ${account.name}`,
-            category: 'Saldo inicial',
-            accountId: account.id,
-            userId: currentUser.uid,
-            date: account.createdAt || new Date(2024, 0, 1), // Fecha anterior a las transacciones
-            createdAt: account.createdAt || new Date(2024, 0, 1),
-            isVirtual: true // Marcador para identificar transacciones virtuales
-          }));
+          const virtualTransactions = accountsToInclude
+            .filter(account => account.balance !== 0) // Solo mostrar cuentas con balance diferente a 0
+            .map(account => {
+              // Para cuentas de débito, el saldo inicial es un ingreso
+              if (account.type === 'debit' && account.balance > 0) {
+                return {
+                  id: `virtual-${account.id}`,
+                  type: 'income' as const,
+                  amount: account.balance,
+                  description: `Saldo inicial - ${account.name}`,
+                  category: 'Saldo inicial',
+                  accountId: account.id,
+                  userId: currentUser.uid,
+                  date: account.createdAt || new Date(2024, 0, 1),
+                  createdAt: account.createdAt || new Date(2024, 0, 1),
+                  isVirtual: true
+                };
+              }
+              // Para cuentas de crédito, el saldo usado es un gasto
+              else if (account.type === 'credit' && account.balance > 0) {
+                return {
+                  id: `virtual-${account.id}`,
+                  type: 'expense' as const,
+                  amount: account.balance,
+                  description: `Saldo usado inicial - ${account.name}`,
+                  category: 'Saldo inicial',
+                  accountId: account.id,
+                  userId: currentUser.uid,
+                  date: account.createdAt || new Date(2024, 0, 1),
+                  createdAt: account.createdAt || new Date(2024, 0, 1),
+                  isVirtual: true
+                };
+              }
+              // Para cuentas de deuda, el saldo es un gasto (lo que se debe)
+              else if (account.type === 'debt' && account.balance > 0) {
+                return {
+                  id: `virtual-${account.id}`,
+                  type: 'expense' as const,
+                  amount: account.balance,
+                  description: `Deuda inicial - ${account.name}`,
+                  category: 'Saldo inicial',
+                  accountId: account.id,
+                  userId: currentUser.uid,
+                  date: account.createdAt || new Date(2024, 0, 1),
+                  createdAt: account.createdAt || new Date(2024, 0, 1),
+                  isVirtual: true
+                };
+              }
+              return null;
+            })
+            .filter(Boolean); // Filtrar valores null
 
-          // Solo agregar ingresos virtuales si no hay filtro de tipo 'expense'
-          if (filters.type !== 'expense') {
-            transactionsData = [...virtualIncomes, ...transactionsData];
-          }
+          // Filtrar por tipo si aplica
+          const filteredVirtualTransactions = virtualTransactions.filter(vt => {
+            if (filters.type === 'all') return true;
+            return vt!.type === filters.type;
+          });
+
+          transactionsData = [...filteredVirtualTransactions, ...transactionsData];
         }
 
         setTransactions(transactionsData);
