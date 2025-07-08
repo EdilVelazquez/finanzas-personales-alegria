@@ -142,44 +142,44 @@ const TransactionsPage: React.FC = () => {
 
   // Función para calcular el saldo acumulado por cuenta
   const calculateRunningBalance = () => {
-    // Ordenar transacciones por fecha ascendente para calcular saldo correcto
-    const sortedTransactions = [...transactions].sort((a, b) => 
+    // Usar TODAS las transacciones (no filtradas) para calcular el saldo correcto
+    const allTransactionsForBalance = [...allTransactions].sort((a, b) => 
       a.date.getTime() - b.date.getTime()
     );
 
     // Crear un mapa para mantener el saldo por cuenta
     const accountBalances: { [accountId: string]: number } = {};
     
-    // Inicializar con el saldo inicial de cada cuenta (como si fuera una transacción inicial)
+    // Inicializar con saldo 0 para cada cuenta (las transacciones virtuales ya incluyen el saldo inicial)
     accounts.forEach(account => {
-      accountBalances[account.id] = account.balance;
+      accountBalances[account.id] = 0;
     });
 
-    // Calcular el saldo después de cada transacción
-    const transactionsWithBalance = sortedTransactions.map(transaction => {
-      const account = accounts.find(acc => acc.id === transaction.accountId);
-      if (!account) {
-        return {
-          ...transaction,
-          accountBalance: 0
-        };
-      }
-
+    // Calcular el saldo después de cada transacción usando TODAS las transacciones
+    const balanceMap: { [transactionId: string]: number } = {};
+    
+    allTransactionsForBalance.forEach(transaction => {
       // Aplicar la transacción al saldo de la cuenta
       if (transaction.type === 'income') {
         accountBalances[transaction.accountId] += transaction.amount;
       } else {
         accountBalances[transaction.accountId] -= transaction.amount;
       }
+      
+      // Guardar el saldo para esta transacción específica
+      balanceMap[transaction.id] = accountBalances[transaction.accountId];
+    });
 
+    // Aplicar los saldos calculados solo a las transacciones filtradas que se muestran
+    const transactionsWithBalance = transactions.map(transaction => {
       return {
         ...transaction,
-        accountBalance: accountBalances[transaction.accountId]
+        accountBalance: balanceMap[transaction.id] || 0
       };
     });
 
-    // Revertir para mostrar las más recientes primero
-    return transactionsWithBalance.reverse();
+    // Ordenar por fecha descendente para mostrar las más recientes primero
+    return transactionsWithBalance.sort((a, b) => b.date.getTime() - a.date.getTime());
   };
 
   const transactionsWithBalance = calculateRunningBalance();
