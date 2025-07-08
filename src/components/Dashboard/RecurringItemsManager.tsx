@@ -36,6 +36,30 @@ const RecurringItemsManager: React.FC<RecurringItemsManagerProps> = ({
     }
   };
 
+  const getPeriodInfo = (date: Date, frequency: string) => {
+    switch (frequency) {
+      case 'weekly':
+        // Calcular número de semana del año
+        const startOfYear = new Date(date.getFullYear(), 0, 1);
+        const pastDaysOfYear = (date.getTime() - startOfYear.getTime()) / 86400000;
+        const weekNumber = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
+        return `Semana ${weekNumber}`;
+      
+      case 'biweekly':
+        // Calcular quincena del mes
+        const day = date.getDate();
+        const quincena = day <= 15 ? 1 : 2;
+        const month = date.toLocaleDateString('es-ES', { month: 'long' });
+        return `${quincena}ª quincena de ${month}`;
+      
+      case 'monthly':
+        return date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+      
+      default:
+        return '';
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Ingresos Fijos */}
@@ -58,7 +82,12 @@ const RecurringItemsManager: React.FC<RecurringItemsManagerProps> = ({
               recurringIncomes.map((income) => (
                 <div key={income.id} className="p-3 bg-green-50 rounded-lg">
                   <div className="flex items-center justify-between mb-1">
-                    <h4 className="font-medium text-gray-900">{income.name}</h4>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-medium text-gray-900">{income.name}</h4>
+                      <p className="text-xs text-blue-600 font-medium">
+                        {getPeriodInfo(income.nextPaymentDate, income.frequency)}
+                      </p>
+                    </div>
                     <div className="flex gap-1">
                       <Button
                         variant="ghost"
@@ -119,7 +148,12 @@ const RecurringItemsManager: React.FC<RecurringItemsManagerProps> = ({
               recurringExpenses.map((expense) => (
                 <div key={expense.id} className="p-3 bg-red-50 rounded-lg">
                   <div className="flex items-center justify-between mb-1">
-                    <h4 className="font-medium text-gray-900">{expense.name}</h4>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-medium text-gray-900">{expense.name}</h4>
+                      <p className="text-xs text-blue-600 font-medium">
+                        {getPeriodInfo(expense.nextPaymentDate, expense.frequency)}
+                      </p>
+                    </div>
                     <div className="flex gap-1">
                       <Button
                         variant="ghost"
