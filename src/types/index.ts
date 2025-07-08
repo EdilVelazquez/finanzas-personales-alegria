@@ -31,6 +31,9 @@ export interface Transaction {
   isVirtual?: boolean; // Para identificar transacciones virtuales (saldos iniciales)
   isInstallment?: boolean; // Para transacciones de planes de pago
   installmentPlanId?: string; // Referencia al plan de pago
+  isTransfer?: boolean; // Para identificar transacciones de transferencia
+  transferFromAccountId?: string; // ID de cuenta origen en transferencias
+  transferToAccountId?: string; // ID de cuenta destino en transferencias
 }
 
 export interface Transfer {

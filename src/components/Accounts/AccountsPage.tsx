@@ -98,33 +98,36 @@ const AccountsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Mis Cuentas</h2>
           <p className="text-gray-600">Gestiona tus cuentas de débito y crédito</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Button 
             onClick={() => setInstallmentFormOpen(true)} 
             variant="outline"
             disabled={creditAccounts.length === 0}
+            className="w-full sm:w-auto"
           >
             <Calendar className="h-4 w-4 mr-2" />
-            Pagos a Meses
+            <span className="hidden sm:inline">Pagos a Meses</span>
+            <span className="sm:hidden">Meses</span>
           </Button>
-          <Button onClick={() => setTransferDialogOpen(true)} variant="outline">
+          <Button onClick={() => setTransferDialogOpen(true)} variant="outline" className="w-full sm:w-auto">
             <CreditCard className="h-4 w-4 mr-2" />
             Transferir
           </Button>
-          <Button onClick={handleCreateAccount}>
+          <Button onClick={handleCreateAccount} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
-            Nueva Cuenta
+            <span className="hidden sm:inline">Nueva Cuenta</span>
+            <span className="sm:hidden">Nueva</span>
           </Button>
         </div>
       </div>
 
       {/* Resumen de cuentas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Total Débito</CardTitle>
@@ -167,22 +170,22 @@ const AccountsPage: React.FC = () => {
       </div>
 
       {/* Lista de cuentas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {accounts.map((account) => (
           <Card key={account.id} className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
                   {account.type === 'debit' ? (
-                    <Wallet className="h-5 w-5 text-green-600" />
+                    <Wallet className="h-5 w-5 text-green-600 flex-shrink-0" />
                   ) : account.type === 'credit' ? (
-                    <CreditCard className="h-5 w-5 text-blue-600" />
+                    <CreditCard className="h-5 w-5 text-blue-600 flex-shrink-0" />
                   ) : (
-                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                    <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" />
                   )}
-                  <CardTitle className="text-lg">{account.name}</CardTitle>
+                  <CardTitle className="text-lg truncate">{account.name}</CardTitle>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1 flex-shrink-0">
                   <Button
                     variant="ghost"
                     size="sm"

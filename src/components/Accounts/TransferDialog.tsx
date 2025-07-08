@@ -139,7 +139,38 @@ const TransferDialog: React.FC<TransferDialogProps> = ({ open, onClose, accounts
         transaction.update(fromAccountRef, { balance: newFromBalance });
         transaction.update(toAccountRef, { balance: newToBalance });
 
-        // Crear registro de transferencia
+        // Crear transacciones individuales para cada cuenta
+        const transactionsRef = collection(db, 'users', currentUser.uid, 'transactions');
+        
+        // Transacción de salida (gasto) en cuenta origen
+        transaction.set(doc(transactionsRef), {
+          type: 'expense',
+          amount,
+          description: `Transferencia a ${toAccount.name}`,
+          category: 'Transferencias',
+          accountId: data.fromAccountId,
+          userId: currentUser.uid,
+          date: new Date(),
+          createdAt: serverTimestamp(),
+          isTransfer: true,
+          transferToAccountId: data.toAccountId,
+        });
+
+        // Transacción de entrada (ingreso) en cuenta destino
+        transaction.set(doc(transactionsRef), {
+          type: 'income',
+          amount,
+          description: `Transferencia desde ${fromAccount.name}`,
+          category: 'Transferencias',
+          accountId: data.toAccountId,
+          userId: currentUser.uid,
+          date: new Date(),
+          createdAt: serverTimestamp(),
+          isTransfer: true,
+          transferFromAccountId: data.fromAccountId,
+        });
+
+        // Crear registro de transferencia para histórico
         const transferRef = collection(db, 'users', currentUser.uid, 'transfers');
         transaction.set(doc(transferRef), {
           amount,
