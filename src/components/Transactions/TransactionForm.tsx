@@ -121,14 +121,40 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
     return unsubscribe;
   }, [currentUser]);
 
+  // Function to get period information
+  const getPeriodInfo = (date: Date, frequency: string) => {
+    switch (frequency) {
+      case 'weekly':
+        // Calcular número de semana del año
+        const startOfYear = new Date(date.getFullYear(), 0, 1);
+        const pastDaysOfYear = (date.getTime() - startOfYear.getTime()) / 86400000;
+        const weekNumber = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
+        return `Semana ${weekNumber}`;
+      
+      case 'biweekly':
+        // Calcular quincena del mes
+        const day = date.getDate();
+        const quincena = day <= 15 ? 1 : 2;
+        const month = date.toLocaleDateString('es-ES', { month: 'long' });
+        return `${quincena}ª quincena de ${month}`;
+      
+      case 'monthly':
+        return date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+      
+      default:
+        return '';
+    }
+  };
+
   // Auto-fill form when recurring expense is selected
   useEffect(() => {
     if (watchRecurringExpenseId && watchRecurringExpenseId !== 'none' && recurringExpenses.length > 0) {
       const selectedExpense = recurringExpenses.find(exp => exp.id === watchRecurringExpenseId);
       if (selectedExpense) {
+        const periodInfo = getPeriodInfo(selectedExpense.nextPaymentDate, selectedExpense.frequency);
         form.setValue('type', 'expense');
         form.setValue('amount', selectedExpense.amount.toString());
-        form.setValue('description', `Pago adelantado: ${selectedExpense.name}`);
+        form.setValue('description', `Pago adelantado: ${selectedExpense.name} - ${periodInfo}`);
         form.setValue('category', selectedExpense.category);
       }
     }
@@ -444,6 +470,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
                         {recurringExpenses.map((expense) => {
                           const today = new Date();
                           const isOverdue = expense.nextPaymentDate < today;
+                          const periodInfo = getPeriodInfo(expense.nextPaymentDate, expense.frequency);
                           return (
                             <SelectItem key={expense.id} value={expense.id}>
                               <div className="flex flex-col gap-1">
@@ -452,6 +479,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
                                   <span className="text-sm text-green-600">
                                     {formatCurrencyWithSymbol(expense.amount)}
                                   </span>
+                                </div>
+                                <div className="text-xs text-blue-600 font-medium">
+                                  {periodInfo}
                                 </div>
                                 <div className="text-xs text-gray-500">
                                   {isOverdue ? 'Vencido: ' : 'Vence: '}
