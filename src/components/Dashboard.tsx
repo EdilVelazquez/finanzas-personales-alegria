@@ -420,14 +420,17 @@ const Dashboard: React.FC = () => {
                     name: `Pago ${account.name}`,
                     amount: account.monthlyPayment || 0,
                     nextPaymentDate: account.nextPaymentDate!,
-                    type: 'debt' as const
+                    type: 'debt' as const,
+                    accountId: account.id // Agregamos accountId para identificar la cuenta
                   }));
 
                 const allUpcomingPayments = [
                   ...upcomingExpenses.map(e => ({ ...e, type: 'expense' as const })),
                   ...upcomingInstallments.map(i => ({ ...i, type: 'installment' as const, name: i.description, amount: i.monthlyAmount })),
                   ...debtPayments
-                ].sort((a, b) => a.nextPaymentDate.getTime() - b.nextPaymentDate.getTime());
+                ]
+                // Asegurar orden correcto por fecha
+                .sort((a, b) => a.nextPaymentDate.getTime() - b.nextPaymentDate.getTime());
 
                 return allUpcomingPayments.length > 0 ? (
                   allUpcomingPayments.slice(0, 5).map((payment, index) => {

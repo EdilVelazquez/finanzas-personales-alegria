@@ -67,6 +67,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
   const { categories } = useCategories();
   const [loading, setLoading] = useState(false);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
+  const [debtPayments, setDebtPayments] = useState<Array<{ id: string; name: string; amount: number; nextPaymentDate: Date; accountId: string }>>([]);
 
   const form = useForm<FormData>({
     defaultValues: {
@@ -87,7 +88,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
   const watchRecurringExpenseId = form.watch('recurringExpenseId');
   const watchUseInstallments = form.watch('useInstallments');
 
-  // Load recurring expenses
+  // Load recurring expenses and debt payments
   useEffect(() => {
     if (!currentUser) return;
 
@@ -121,6 +122,35 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
     return unsubscribe;
   }, [currentUser]);
 
+  // Load debt payments
+  useEffect(() => {
+    if (!accounts.length) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+    const thirtyDaysFromNow = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
+
+    const availableDebtPayments = accounts
+      .filter(account => 
+        account.type === 'debt' && 
+        account.nextPaymentDate && 
+        account.monthlyPayment &&
+        account.nextPaymentDate >= thirtyDaysAgo &&
+        account.nextPaymentDate <= thirtyDaysFromNow
+      )
+      .map(account => ({
+        id: `debt-${account.id}`,
+        name: `Pago ${account.name}`,
+        amount: account.monthlyPayment!,
+        nextPaymentDate: account.nextPaymentDate!,
+        accountId: account.id
+      }))
+      .sort((a, b) => a.nextPaymentDate.getTime() - b.nextPaymentDate.getTime());
+
+    setDebtPayments(availableDebtPayments);
+  }, [accounts]);
+
   // Function to get period information
   const getPeriodInfo = (date: Date, frequency: string) => {
     switch (frequency) {
@@ -146,9 +176,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
     }
   };
 
-  // Auto-fill form when recurring expense is selected
+  // Auto-fill form when recurring expense or debt payment is selected
   useEffect(() => {
-    if (watchRecurringExpenseId && watchRecurringExpenseId !== 'none' && recurringExpenses.length > 0) {
+    if (watchRecurringExpenseId && watchRecurringExpenseId !== 'none') {
+      // Check if it's a recurring expense
       const selectedExpense = recurringExpenses.find(exp => exp.id === watchRecurringExpenseId);
       if (selectedExpense) {
         const periodInfo = getPeriodInfo(selectedExpense.nextPaymentDate, selectedExpense.frequency);
@@ -156,9 +187,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         form.setValue('amount', selectedExpense.amount.toString());
         form.setValue('description', `Pago adelantado: ${selectedExpense.name} - ${periodInfo}`);
         form.setValue('category', selectedExpense.category);
+        return;
+      }
+
+      // Check if it's a debt payment
+      const selectedDebtPayment = debtPayments.find(debt => debt.id === watchRecurringExpenseId);
+      if (selectedDebtPayment) {
+        form.setValue('type', 'expense');
+        form.setValue('amount', selectedDebtPayment.amount.toString());
+        form.setValue('description', selectedDebtPayment.name);
+        form.setValue('category', 'Deudas');
+        form.setValue('accountId', selectedDebtPayment.accountId);
       }
     }
-  }, [watchRecurringExpenseId, recurringExpenses, form]);
+  }, [watchRecurringExpenseId, recurringExpenses, debtPayments, form]);
 
   useEffect(() => {
     if (transaction) {
@@ -436,6 +478,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
   };
 
   const selectedRecurringExpense = recurringExpenses.find(exp => exp.id === watchRecurringExpenseId);
+  const selectedDebtPayment = debtPayments.find(debt => debt.id === watchRecurringExpenseId);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -449,7 +492,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {/* Selector de pago recurrente - Solo para gastos y cuando no está editando */}
-            {!transaction && watchType === 'expense' && recurringExpenses.length > 0 && (
+            {!transaction && watchType === 'expense' && (recurringExpenses.length > 0 || debtPayments.length > 0) && (
               <FormField
                 control={form.control}
                 name="recurringExpenseId"
@@ -467,36 +510,80 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="none">Ninguno - transacción nueva</SelectItem>
-                        {recurringExpenses.map((expense) => {
-                          const today = new Date();
-                          const isOverdue = expense.nextPaymentDate < today;
-                          const periodInfo = getPeriodInfo(expense.nextPaymentDate, expense.frequency);
-                          return (
-                            <SelectItem key={expense.id} value={expense.id}>
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center justify-between w-full">
-                                  <span className="font-medium">{expense.name}</span>
-                                  <span className="text-sm text-green-600">
-                                    {formatCurrencyWithSymbol(expense.amount)}
-                                  </span>
-                                </div>
-                                <div className="text-xs text-blue-600 font-medium">
-                                  {periodInfo}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {isOverdue ? 'Vencido: ' : 'Vence: '}
-                                  {expense.nextPaymentDate.toLocaleDateString('es-ES')}
-                                  {isOverdue && <span className="ml-1 text-red-500 font-medium">(PENDIENTE)</span>}
-                                </div>
-                              </div>
-                            </SelectItem>
-                          );
-                        })}
+                        
+                        {/* Gastos recurrentes */}
+                        {recurringExpenses.length > 0 && (
+                          <>
+                            <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50">
+                              📅 Gastos Recurrentes
+                            </div>
+                            {recurringExpenses.map((expense) => {
+                              const today = new Date();
+                              const isOverdue = expense.nextPaymentDate < today;
+                              const periodInfo = getPeriodInfo(expense.nextPaymentDate, expense.frequency);
+                              return (
+                                <SelectItem key={expense.id} value={expense.id}>
+                                  <div className="flex flex-col gap-1">
+                                    <div className="flex items-center justify-between w-full">
+                                      <span className="font-medium">{expense.name}</span>
+                                      <span className="text-sm text-green-600">
+                                        {formatCurrencyWithSymbol(expense.amount)}
+                                      </span>
+                                    </div>
+                                    <div className="text-xs text-blue-600 font-medium">
+                                      {periodInfo}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {isOverdue ? 'Vencido: ' : 'Vence: '}
+                                      {expense.nextPaymentDate.toLocaleDateString('es-ES')}
+                                      {isOverdue && <span className="ml-1 text-red-500 font-medium">(PENDIENTE)</span>}
+                                    </div>
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
+                          </>
+                        )}
+
+                        {/* Pagos de deuda */}
+                        {debtPayments.length > 0 && (
+                          <>
+                            <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50">
+                              💳 Pagos de Deuda
+                            </div>
+                            {debtPayments.map((debtPayment) => {
+                              const today = new Date();
+                              const isOverdue = debtPayment.nextPaymentDate < today;
+                              return (
+                                <SelectItem key={debtPayment.id} value={debtPayment.id}>
+                                  <div className="flex flex-col gap-1">
+                                    <div className="flex items-center justify-between w-full">
+                                      <span className="font-medium">{debtPayment.name}</span>
+                                      <span className="text-sm text-red-600">
+                                        {formatCurrencyWithSymbol(debtPayment.amount)}
+                                      </span>
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {isOverdue ? 'Vencido: ' : 'Vence: '}
+                                      {debtPayment.nextPaymentDate.toLocaleDateString('es-ES')}
+                                      {isOverdue && <span className="ml-1 text-red-500 font-medium">(PENDIENTE)</span>}
+                                    </div>
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                     {selectedRecurringExpense && (
                       <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
                         💡 Al confirmar, este pago se marcará como saldado y la próxima fecha se actualizará automáticamente.
+                      </div>
+                    )}
+                    {selectedDebtPayment && (
+                      <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded">
+                        💳 Pago de deuda programado. Se registrará la transacción y deberá actualizar manualmente la fecha del próximo pago en la cuenta.
                       </div>
                     )}
                     <FormMessage />
