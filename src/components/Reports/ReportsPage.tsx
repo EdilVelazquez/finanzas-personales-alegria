@@ -8,6 +8,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import ReportFilters from './ReportFilters';
 import FinancialSummaryReport from './FinancialSummaryReport';
+import IncomeExpensesReport from './IncomeExpensesReport';
 import { useReportFilters } from '@/hooks/useReportFilters';
 import { Account } from '@/types';
 
@@ -90,6 +91,8 @@ const ReportsPage: React.FC = () => {
     switch (selectedReportType) {
       case 'financial-summary':
         return <FinancialSummaryReport accounts={accounts} filters={filters} />;
+      case 'income-expenses':
+        return <IncomeExpensesReport accounts={accounts} filters={filters} />;
       default:
         return (
           <div className="text-center py-12">
