@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, query, onSnapshot, orderBy, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Account, Transaction, RecurringExpense, InstallmentPlan } from '@/types';
+import { Account, Transaction, RecurringExpense, RecurringIncome, InstallmentPlan } from '@/types';
 import { useCategories } from '@/hooks/useCategories';
 import {
   Dialog,
@@ -57,6 +57,7 @@ interface FormData {
   category: string;
   accountId: string;
   recurringExpenseId?: string;
+  recurringIncomeId?: string;
   installmentMonths?: number;
   useInstallments?: boolean;
 }
@@ -67,6 +68,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
   const { categories } = useCategories();
   const [loading, setLoading] = useState(false);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
+  const [recurringIncomes, setRecurringIncomes] = useState<RecurringIncome[]>([]);
   const [debtPayments, setDebtPayments] = useState<Array<{ id: string; name: string; amount: number; nextPaymentDate: Date; accountId: string }>>([]);
 
   const form = useForm<FormData>({
@@ -78,6 +80,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
       category: '',
       accountId: '',
       recurringExpenseId: 'none',
+      recurringIncomeId: 'none',
       installmentMonths: 1,
       useInstallments: false,
     },
@@ -86,9 +89,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
   const watchType = form.watch('type');
   const watchAccountId = form.watch('accountId');
   const watchRecurringExpenseId = form.watch('recurringExpenseId');
+  const watchRecurringIncomeId = form.watch('recurringIncomeId');
   const watchUseInstallments = form.watch('useInstallments');
 
-  // Load recurring expenses and debt payments
+  // Load recurring expenses and incomes
   useEffect(() => {
     if (!currentUser) return;
 
@@ -97,7 +101,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
       orderBy('nextPaymentDate', 'asc')
     );
 
-    const unsubscribe = onSnapshot(recurringExpensesQuery, (snapshot) => {
+    const recurringIncomesQuery = query(
+      collection(db, 'users', currentUser.uid, 'recurringIncomes'),
+      orderBy('nextPaymentDate', 'asc')
+    );
+
+    const unsubscribeExpenses = onSnapshot(recurringExpensesQuery, (snapshot) => {
       const expensesData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
@@ -119,7 +128,32 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
       setRecurringExpenses(availableExpenses);
     });
 
-    return unsubscribe;
+    const unsubscribeIncomes = onSnapshot(recurringIncomesQuery, (snapshot) => {
+      const incomesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        nextPaymentDate: doc.data().nextPaymentDate?.toDate(),
+        createdAt: doc.data().createdAt?.toDate()
+      })) as RecurringIncome[];
+      
+      // Show incomes from 30 days ago (vencidos) hasta 30 días en el futuro
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Start of today
+      const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+      const thirtyDaysFromNow = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
+      const availableIncomes = incomesData.filter(income => {
+        const incomeDate = new Date(income.nextPaymentDate);
+        incomeDate.setHours(0, 0, 0, 0); // Start of income date
+        return incomeDate >= thirtyDaysAgo && incomeDate <= thirtyDaysFromNow;
+      });
+      
+      setRecurringIncomes(availableIncomes);
+    });
+
+    return () => {
+      unsubscribeExpenses();
+      unsubscribeIncomes();
+    };
   }, [currentUser]);
 
   // Load debt payments
@@ -202,6 +236,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
     }
   }, [watchRecurringExpenseId, recurringExpenses, debtPayments, form]);
 
+  // Auto-fill form when recurring income is selected
+  useEffect(() => {
+    if (watchRecurringIncomeId && watchRecurringIncomeId !== 'none') {
+      const selectedIncome = recurringIncomes.find(inc => inc.id === watchRecurringIncomeId);
+      if (selectedIncome) {
+        const periodInfo = getPeriodInfo(selectedIncome.nextPaymentDate, selectedIncome.frequency);
+        form.setValue('type', 'income');
+        form.setValue('amount', selectedIncome.amount.toString());
+        form.setValue('description', `Ingreso adelantado: ${selectedIncome.name} - ${periodInfo}`);
+        form.setValue('category', 'Salario'); // Default category for income
+      }
+    }
+  }, [watchRecurringIncomeId, recurringIncomes, form]);
+
   useEffect(() => {
     if (transaction) {
       form.reset({
@@ -212,6 +260,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         category: transaction.category,
         accountId: transaction.accountId,
         recurringExpenseId: 'none',
+        recurringIncomeId: 'none',
         installmentMonths: 1,
         useInstallments: false,
       });
@@ -224,6 +273,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         category: '',
         accountId: '',
         recurringExpenseId: 'none',
+        recurringIncomeId: 'none',
         installmentMonths: 1,
         useInstallments: false,
       });
@@ -350,6 +400,31 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
     });
   };
 
+  const updateRecurringIncomeNextPayment = async (recurringIncomeId: string) => {
+    const income = recurringIncomes.find(inc => inc.id === recurringIncomeId);
+    if (!income) return;
+
+    // Calculate next payment date based on frequency
+    const currentDate = income.nextPaymentDate;
+    let nextPaymentDate = new Date(currentDate);
+
+    switch (income.frequency) {
+      case 'weekly':
+        nextPaymentDate.setDate(nextPaymentDate.getDate() + 7);
+        break;
+      case 'biweekly':
+        nextPaymentDate.setDate(nextPaymentDate.getDate() + 14);
+        break;
+      case 'monthly':
+        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+        break;
+    }
+
+    await updateDoc(doc(db, 'users', currentUser!.uid, 'recurringIncomes', recurringIncomeId), {
+      nextPaymentDate: Timestamp.fromDate(nextPaymentDate)
+    });
+  };
+
   const getAvailableCategories = () => {
     return categories.filter(cat => cat.type === watchType);
   };
@@ -456,6 +531,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
             title: 'Pago adelantado registrado',
             description: 'El pago recurrente ha sido marcado como saldado y se actualizó la próxima fecha.',
           });
+        } else if (data.recurringIncomeId && data.recurringIncomeId !== 'none') {
+          // Si se seleccionó un ingreso recurrente, actualizar su próxima fecha de pago
+          await updateRecurringIncomeNextPayment(data.recurringIncomeId);
+          toast({
+            title: 'Ingreso adelantado registrado',
+            description: 'El ingreso recurrente ha sido marcado como recibido y se actualizó la próxima fecha.',
+          });
         } else {
           toast({
             title: 'Transacción creada',
@@ -479,6 +561,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
 
   const selectedRecurringExpense = recurringExpenses.find(exp => exp.id === watchRecurringExpenseId);
   const selectedDebtPayment = debtPayments.find(debt => debt.id === watchRecurringExpenseId);
+  const selectedRecurringIncome = recurringIncomes.find(inc => inc.id === watchRecurringIncomeId);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -491,6 +574,65 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Selector de ingreso recurrente - Solo para ingresos y cuando no está editando */}
+            {!transaction && watchType === 'income' && recurringIncomes.length > 0 && (
+              <FormField
+                control={form.control}
+                name="recurringIncomeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Adelantar ingreso programado (opcional)
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={loading}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona un ingreso para adelantar" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Ninguno - transacción nueva</SelectItem>
+                        
+                        {/* Ingresos recurrentes */}
+                        {recurringIncomes.map((income) => {
+                          const today = new Date();
+                          const isOverdue = income.nextPaymentDate < today;
+                          const periodInfo = getPeriodInfo(income.nextPaymentDate, income.frequency);
+                          return (
+                            <SelectItem key={income.id} value={income.id}>
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="font-medium">{income.name}</span>
+                                  <span className="text-sm text-green-600">
+                                    {formatCurrencyWithSymbol(income.amount)}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-blue-600 font-medium">
+                                  {periodInfo}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {isOverdue ? 'Vencido: ' : 'Vence: '}
+                                  {income.nextPaymentDate.toLocaleDateString('es-ES')}
+                                  {isOverdue && <span className="ml-1 text-red-500 font-medium">(PENDIENTE)</span>}
+                                </div>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    {selectedRecurringIncome && (
+                      <div className="text-xs text-green-600 bg-green-50 p-2 rounded">
+                        💡 Al confirmar, este ingreso se marcará como recibido y la próxima fecha se actualizará automáticamente.
+                      </div>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             {/* Selector de pago recurrente - Solo para gastos y cuando no está editando */}
             {!transaction && watchType === 'expense' && (recurringExpenses.length > 0 || debtPayments.length > 0) && (
               <FormField
