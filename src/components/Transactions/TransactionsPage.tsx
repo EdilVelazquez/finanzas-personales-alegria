@@ -54,6 +54,7 @@ const TransactionsPage: React.FC = () => {
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [accountTypeFilter, setAccountTypeFilter] = useState<'all' | 'debit' | 'credit' | 'debt'>('all');
   const [dateFilter, setDateFilter] = useState<'all' | 'current_month' | 'previous_month' | 'custom'>('current_month');
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
@@ -120,6 +121,13 @@ const TransactionsPage: React.FC = () => {
       filteredTransactions = filteredTransactions.filter(t => t.accountId === selectedAccountId);
     }
     
+    // Filtro por tipo de cuenta
+    if (accountTypeFilter !== 'all') {
+      const accountsOfType = accounts.filter(acc => acc.type === accountTypeFilter);
+      const accountIdsOfType = accountsOfType.map(acc => acc.id);
+      filteredTransactions = filteredTransactions.filter(t => accountIdsOfType.includes(t.accountId));
+    }
+    
     // Filtro por tipo
     if (typeFilter !== 'all') {
       filteredTransactions = filteredTransactions.filter(t => t.type === typeFilter);
@@ -138,7 +146,7 @@ const TransactionsPage: React.FC = () => {
     
     setTransactions(filteredTransactions);
     setLoading(transactionsLoading);
-  }, [allTransactions, selectedAccountId, typeFilter, categoryFilter, dateFilter, customStartDate, customEndDate, transactionsLoading]);
+  }, [allTransactions, selectedAccountId, typeFilter, categoryFilter, accountTypeFilter, dateFilter, customStartDate, customEndDate, transactionsLoading, accounts]);
 
   // Función para calcular el saldo acumulado por cuenta
   const calculateRunningBalance = () => {
@@ -323,7 +331,7 @@ const TransactionsPage: React.FC = () => {
         </Tabs>
 
         {/* Filtros adicionales */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Filtro de período */}
           <Card className="p-4">
             <div className="space-y-2">
@@ -382,6 +390,24 @@ const TransactionsPage: React.FC = () => {
                       </div>
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </Card>
+
+          {/* Filtro de tipo de cuenta */}
+          <Card className="p-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Tipo de cuenta</Label>
+              <Select value={accountTypeFilter} onValueChange={(value: any) => setAccountTypeFilter(value)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background">
+                  <SelectItem value="all">Todos los tipos</SelectItem>
+                  <SelectItem value="debit">Débito</SelectItem>
+                  <SelectItem value="credit">Crédito</SelectItem>
+                  <SelectItem value="debt">Deuda</SelectItem>
                 </SelectContent>
               </Select>
             </div>
